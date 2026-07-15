@@ -415,23 +415,28 @@ function logFloor(h) {
   for (const k of Object.keys(state.logs)) if (state.logs[k][h.id] !== undefined && k < min) min = k;
   return min;
 }
+/* A habit may carry a "starting streak" (h.base) from before it was tracked
+   here. It counts only while the run is unbroken all the way back to the first
+   tracked day — one missed day and the base is gone, like any real streak. */
 function currentStreak(h) {
   let d = new Date();
   if (!successOn(h, toKey(d))) d = addDays(d, -1);   // today isn't over — don't break the streak yet
   const floor = logFloor(h);
-  let s = 0;
-  while (toKey(d) >= floor) {
+  let s = 0, unbrokenToStart = false;
+  while (true) {
+    if (toKey(d) < floor) { unbrokenToStart = true; break; }
     if (!successOn(h, toKey(d))) break;
     s++; d = addDays(d, -1);
-    if (s > 3660) break;
+    if (s > 36600) break;
   }
-  return s;
+  return s + (unbrokenToStart ? (h.base || 0) : 0);
 }
 function bestStreak(h) {
-  let best = 0, run = 0;
+  let best = 0, run = 0, anchored = true;   // the run growing from the first tracked day carries the base
   const t = todayKey();
   for (let d = fromKey(logFloor(h)); toKey(d) <= t; d = addDays(d, 1)) {
-    if (successOn(h, toKey(d))) { run++; if (run > best) best = run; } else run = 0;
+    if (successOn(h, toKey(d))) { run++; best = Math.max(best, run + (anchored ? (h.base || 0) : 0)); }
+    else { run = 0; anchored = false; }
   }
   return Math.max(best, currentStreak(h));
 }
@@ -500,7 +505,7 @@ function renderToday() {
 function cardHTML(h) {
   const v = getVal(h.id, viewDate);
   const cs = currentStreak(h);
-  const flame = cs > 0 ? `<span class="streak-pill ${cs >= 7 ? 'hot' : ''}">🔥 ${cs} day${cs > 1 ? 's' : ''}</span>` : `<span class="streak-pill">Start a streak</span>`;
+  const flame = cs > 0 ? `<span class="streak-pill ${cs >= 7 ? 'hot' : ''}">🔥 ${cs.toLocaleString()} day${cs > 1 ? 's' : ''}</span>` : `<span class="streak-pill">Start a streak</span>`;
   let control = '', extra = '';
   if (h.type === 'check') {
     control = `<button class="check-btn ${v >= 1 ? 'done' : ''}" data-act="toggle" aria-label="Mark ${esc(h.name)} ${v >= 1 ? 'not done' : 'done'}">✓</button>`;
@@ -557,7 +562,7 @@ function bindCard(h) {
     render();
     if (act === 'toggle' && getVal(h.id, viewDate) >= 1) {
       const cs = currentStreak(h);
-      if (cs === 1) toast('Nice — day one 🔥'); else if (cs % 7 === 0) toast(`🔥 ${cs}-day streak!`);
+      if (cs === 1) toast('Nice — day one 🔥'); else if (cs % 7 === 0) toast(`🔥 ${cs.toLocaleString()}-day streak!`);
     }
   });
 }
@@ -594,8 +599,8 @@ function renderTrends() {
     return `<div class="card" style="--accent:${hueVar(h)}; margin:10px 0">
       <div class="trend-head"><div class="icon-chip">${icon(h.icon)}</div><h3>${esc(h.name)}</h3></div>
       <div class="tiles">
-        <div class="tile"><div class="t-label">Streak</div><div class="t-value">${cs > 0 ? '🔥 ' : ''}${cs}<span class="u"> d</span></div></div>
-        <div class="tile"><div class="t-label">Best</div><div class="t-value">${bs}<span class="u"> d</span></div></div>
+        <div class="tile"><div class="t-label">Streak</div><div class="t-value">${cs > 0 ? '🔥 ' : ''}${cs.toLocaleString()}<span class="u"> d</span></div></div>
+        <div class="tile"><div class="t-label">Best</div><div class="t-value">${bs.toLocaleString()}<span class="u"> d</span></div></div>
         <div class="tile"><div class="t-label">Last 30 days</div><div class="t-value">${r}<span class="u">%</span></div></div>
       </div>
       ${weekTiles}${chart}
@@ -861,6 +866,9 @@ function openHabitSheet(h) {
       <div class="field" id="f-unit-wrap"><label for="f-unit">Unit</label>
         <input type="text" id="f-unit" placeholder="glasses" value="${h ? esc(h.unit || '') : ''}" maxlength="14"></div>
     </div>
+    <div class="field"><label for="f-base">Starting streak (days)</label>
+      <input type="number" id="f-base" inputmode="numeric" min="0" step="1" value="${h && h.base ? h.base : 0}">
+      <div class="hint">Already on a run before adding it here? Carry it over — e.g. 1,004. It keeps counting until you miss a day.</div></div>
     <button class="primary-btn" id="f-save">${h ? 'Save changes' : 'Add habit'}</button>
     ${h ? '<button class="danger-link" id="f-delete">Delete habit & its history</button>' : ''}`;
   const syncType = () => {
@@ -880,7 +888,8 @@ function openHabitSheet(h) {
     const name = $('#f-name').value.trim();
     if (!name) { $('#f-name').focus(); return; }
     const goal = Math.max(sheetType === 'limit' ? 0 : 1, parseInt($('#f-goal').value, 10) || 1);
-    const fields = { name, icon: sheetIcon, type: sheetType, goal, unit: $('#f-unit').value.trim() };
+    const base = Math.max(0, parseInt($('#f-base').value, 10) || 0);
+    const fields = { name, icon: sheetIcon, type: sheetType, goal, unit: $('#f-unit').value.trim(), base };
     if (h) Object.assign(h, fields);
     else state.habits.push({ id: uid(), ...fields, hue: state.habits.length % HUES, createdAt: todayKey(), archived: false });
     save(); closeSheet(); render();

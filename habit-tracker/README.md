@@ -15,6 +15,10 @@ HTML file plus a service worker. All data lives in `localStorage` on the device.
 Streaks get a one-day grace: today doesn't break the streak until it's over.
 Past days can be backfilled with the ‹ › arrows on the Today screen.
 
+A habit can carry a **starting streak** (set it when adding/editing) for runs
+you built up before tracking here — e.g. 1,004 days. It counts on top of the
+tracked streak and is forfeited the first time you miss a day.
+
 ## Features
 
 - "Stay under" entries are time-stamped: each **+** records the clock time; tap
