@@ -489,7 +489,10 @@ function bindCard(h) {
 /* =============== render: trends =============== */
 const RAMP_LIGHT = ['#cde2fb', '#9ec5f4', '#5598e7', '#2a78d6', '#184f95'];
 const RAMP_DARK  = ['#0d366b', '#184f95', '#256abf', '#3987e5', '#86b6ef'];
-const isDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+const isDark = () => {
+  const t = document.documentElement.dataset.theme;   // host page may stamp a manual toggle
+  return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+};
 const ramp = t => { const r = isDark() ? RAMP_DARK : RAMP_LIGHT; return r[Math.max(0, Math.min(r.length - 1, Math.round(t * (r.length - 1))))]; };
 
 function renderTrends() {
@@ -824,6 +827,7 @@ function render() {
   else renderManage();
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', render);
+new MutationObserver(render).observe(document.documentElement, { attributeFilter: ['data-theme'] });
 render();
 // New day rollover while the app stays open on the home screen
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (viewDate > todayKey()) viewDate = todayKey(); render(); } });
