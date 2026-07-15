@@ -259,6 +259,27 @@
   }
   .toast.show{opacity:1; transform:translateX(-50%)}
   .view{display:none} .view.active{display:block}
+
+  /* ---------- passcode lock ---------- */
+  .lock{position:fixed; inset:0; z-index:100; background:var(--page); display:grid; place-items:center; padding:24px}
+  .lock[hidden]{display:none}
+  body.locked main, body.locked header.app, body.locked nav.tabs{visibility:hidden}
+  .lock-card{width:100%; max-width:320px; text-align:center}
+  .lock-flame{display:flex; justify-content:center; color:var(--accent); margin-bottom:14px}
+  .lock-flame .ic{width:52px; height:52px}
+  .lock-card h2{font-size:20px; margin-bottom:18px; letter-spacing:-.2px}
+  .lock-card input[type=password]{
+    width:100%; padding:14px; border-radius:14px; border:1px solid var(--border);
+    background:var(--surface); color:var(--ink); font-size:22px; text-align:center; letter-spacing:4px;
+  }
+  .lock-card .remember{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    font-size:13.5px; color:var(--ink-2); margin:14px 0 4px; user-select:none;
+  }
+  .lock-card .remember input{width:17px; height:17px; accent-color:var(--accent)}
+  .lock-err{min-height:20px; font-size:13px; font-weight:600; color:var(--crit); margin-top:10px}
+  .lock-card.shake{animation:shake .35s}
+  @keyframes shake{20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
   @media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important} }
 </style>
 </head>
@@ -284,6 +305,8 @@
   <section class="view" id="view-manage">
     <div class="cards" id="manage-cards"></div>
     <button class="add-btn" id="add-habit-btn">＋ New habit</button>
+    <div class="section-title">App lock</div>
+    <div class="data-actions" id="lock-actions"></div>
     <div class="section-title">Your data</div>
     <div class="data-actions">
       <button class="ghost-btn" id="export-btn">Export JSON</button>
@@ -302,6 +325,20 @@
     <button class="tab" data-view="manage"><span class="t-ico" data-tab-icon="sliders"></span>Habits</button>
   </div>
 </nav>
+
+<div class="lock" id="lock-screen" hidden role="dialog" aria-label="Passcode required">
+  <div class="lock-card" id="lock-card">
+    <div class="lock-flame"><span data-tab-icon="flame"></span></div>
+    <h2>Ember is locked</h2>
+    <form id="lock-form">
+      <input type="password" id="lock-pass" placeholder="Passcode" autocomplete="current-password" inputmode="text" aria-label="Passcode">
+      <label class="remember"><input type="checkbox" id="lock-remember" checked> Remember this device for 30 days</label>
+      <button type="submit" class="primary-btn" id="lock-unlock">Unlock</button>
+    </form>
+    <div class="lock-err" id="lock-err"></div>
+    <button class="danger-link" id="lock-forgot">Forgot passcode?</button>
+  </div>
+</div>
 
 <div class="sheet-scrim" id="sheet-scrim"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
@@ -839,6 +876,7 @@ function renderManage() {
     const h = state.habits.find(x => x.id === b.dataset.arch);
     h.archived = !h.archived; save(); render();
   }));
+  renderLockActions();
 }
 
 /* =============== bottom sheet: add / edit habit =============== */
@@ -961,6 +999,109 @@ function openSheet() { document.body.classList.add('sheet-open'); }
 function closeSheet() { document.body.classList.remove('sheet-open'); }
 $('#sheet-scrim').addEventListener('click', closeSheet);
 
+/* =============== passcode lock ===============
+   Static app, no server: the passcode is stored as a salted PBKDF2-SHA-256
+   hash in localStorage and gates the UI. "Remember this device" is a local
+   expiry flag (the no-server equivalent of a remember-me cookie). */
+const UNLOCK_KEY = 'ember.unlock';
+const lockSupported = () => window.isSecureContext && !!(crypto && crypto.subtle);
+const bufToHex = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+const hexToBuf = h => new Uint8Array((h.match(/../g) || []).map(x => parseInt(x, 16)));
+function randHex(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return bufToHex(a.buffer); }
+async function passHash(pass, saltHex, iterations) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: hexToBuf(saltHex), iterations }, key, 256);
+  return bufToHex(bits);
+}
+async function verifyPass(pass) {
+  const l = state.settings.lock;
+  return !!l && (await passHash(pass, l.salt, l.iterations)) === l.hash;
+}
+function rememberDevice(days) { try { localStorage.setItem(UNLOCK_KEY, JSON.stringify({ until: Date.now() + days * 864e5 })); } catch (e) {} }
+function forgetDevice() { try { localStorage.removeItem(UNLOCK_KEY); } catch (e) {} }
+let unlockedThisSession = false;
+function lockActive() {
+  if (!state.settings.lock || !lockSupported() || unlockedThisSession) return false;
+  try { const r = JSON.parse(localStorage.getItem(UNLOCK_KEY)); if (r && r.until > Date.now()) return false; } catch (e) {}
+  return true;
+}
+function showLock() { $('#lock-screen').hidden = false; document.body.classList.add('locked'); setTimeout(() => $('#lock-pass').focus(), 150); }
+function hideLock() { $('#lock-screen').hidden = true; document.body.classList.remove('locked'); }
+$('#lock-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const pass = $('#lock-pass').value;
+  if (!pass) return;
+  $('#lock-unlock').disabled = true;
+  const ok = await verifyPass(pass).catch(() => false);
+  $('#lock-unlock').disabled = false;
+  if (ok) {
+    unlockedThisSession = true;
+    if ($('#lock-remember').checked) rememberDevice(30);
+    $('#lock-pass').value = ''; $('#lock-err').textContent = '';
+    hideLock();
+  } else {
+    $('#lock-err').textContent = 'Wrong passcode — try again.';
+    $('#lock-pass').value = ''; $('#lock-pass').focus();
+    const c = $('#lock-card'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
+  }
+});
+$('#lock-forgot').addEventListener('click', () => {
+  if (!confirm('Without the passcode the only way back in is a full reset — ALL habits and history on this device are erased. Continue?')) return;
+  if (!confirm('Really erase everything? There is no undo.')) return;
+  try { localStorage.removeItem(STORE_KEY); localStorage.removeItem(UNLOCK_KEY); } catch (e) {}
+  location.reload();
+});
+
+function renderLockActions() {
+  const la = $('#lock-actions');
+  if (!lockSupported()) { la.innerHTML = '<p class="hint wide">Passcode lock needs HTTPS (or localhost).</p>'; return; }
+  la.innerHTML = state.settings.lock
+    ? `<button class="ghost-btn" id="lk-change">Change passcode</button>
+       <button class="ghost-btn" id="lk-now">Lock now</button>
+       <button class="ghost-btn danger wide" id="lk-remove">Remove lock</button>`
+    : `<button class="ghost-btn wide" id="lk-set">Set a passcode</button>`;
+  const on = (id, fn) => { const b = $(id); if (b) b.addEventListener('click', fn); };
+  on('#lk-set', () => openLockSheet('set'));
+  on('#lk-change', () => openLockSheet('change'));
+  on('#lk-remove', () => openLockSheet('remove'));
+  on('#lk-now', () => { forgetDevice(); unlockedThisSession = false; showLock(); });
+}
+function openLockSheet(mode) {
+  const sheet = $('#sheet');
+  const titles = { set: 'Set a passcode', change: 'Change passcode', remove: 'Remove lock' };
+  sheet.innerHTML = `
+    <div class="grabber"></div>
+    <h2>${titles[mode]}</h2>
+    ${mode !== 'set' ? `<div class="field"><label for="lk-cur">Current passcode</label>
+      <input type="password" id="lk-cur" autocomplete="current-password"></div>` : ''}
+    ${mode !== 'remove' ? `<div class="field"><label for="lk-new">New passcode (4+ characters)</label>
+      <input type="password" id="lk-new" autocomplete="new-password"></div>
+    <div class="field"><label for="lk-conf">Repeat it</label>
+      <input type="password" id="lk-conf" autocomplete="new-password"></div>
+    <p class="hint">Locks the app behind a passcode when you open it. If you forget it, the only way back in is erasing the app's data — keep a backup exported.</p>` : ''}
+    <button class="primary-btn" id="lk-save">${titles[mode]}</button>
+    <div class="lock-err" id="lk-err"></div>`;
+  $('#lk-save').addEventListener('click', async () => {
+    const err = m => { $('#lk-err').textContent = m; };
+    if (mode !== 'set' && !(await verifyPass($('#lk-cur').value).catch(() => false))) return err('Current passcode is wrong.');
+    if (mode === 'remove') {
+      delete state.settings.lock; save(); forgetDevice();
+      closeSheet(); renderLockActions(); toast('Lock removed'); return;
+    }
+    const p = $('#lk-new').value;
+    if (p.length < 4) return err('Use at least 4 characters.');
+    if (p !== $('#lk-conf').value) return err('Passcodes don’t match.');
+    const salt = randHex(16), iterations = 180000;
+    state.settings.lock = { salt, iterations, hash: await passHash(p, salt, iterations) };
+    save();
+    unlockedThisSession = true; rememberDevice(30);   // don't lock the device that just set it
+    closeSheet(); renderLockActions();
+    toast(mode === 'set' ? 'Passcode set 🔒' : 'Passcode changed');
+  });
+  openSheet();
+  setTimeout(() => $(mode === 'set' ? '#lk-new' : '#lk-cur').focus(), 250);
+}
+
 /* =============== data actions =============== */
 $('#add-habit-btn').addEventListener('click', () => openHabitSheet(null));
 $('#export-btn').addEventListener('click', () => {
@@ -1002,6 +1143,7 @@ document.querySelectorAll('[data-tab-icon]').forEach(el => { el.innerHTML = icon
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', render);
 new MutationObserver(render).observe(document.documentElement, { attributeFilter: ['data-theme'] });
 render();
+if (lockActive()) showLock();
 // New day rollover while the app stays open on the home screen
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (viewDate > todayKey()) viewDate = todayKey(); render(); } });
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {

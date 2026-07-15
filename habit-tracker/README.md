@@ -28,6 +28,9 @@ tracked streak and is forfeited the first time you miss a day.
 - 90-day trend line for measured habits (weight), 14-day bars vs. goal/limit
 - Add/edit/pause habits, JSON export/import backup
 - Installable PWA: offline-capable, add-to-home-screen, dark & light themes
+- Optional passcode lock (Habits → App lock): salted PBKDF2 hash, no plaintext
+  stored, with a "remember this device for 30 days" flag — a privacy gate for
+  hosting the app at a public URL, not real security (the data is on-device)
 
 ## Run it
 
