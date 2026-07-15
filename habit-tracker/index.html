@@ -83,10 +83,18 @@
     box-shadow:var(--shadow); padding:14px; position:relative; overflow:hidden;
   }
   .habit-row{display:flex; align-items:center; gap:12px}
-  .emoji-chip{
+  .icon-chip{
     width:46px; height:46px; flex:none; border-radius:14px; display:grid; place-items:center;
-    font-size:24px; background:color-mix(in srgb, var(--accent) 14%, var(--surface));
+    color:var(--accent); background:color-mix(in srgb, var(--accent) 14%, var(--surface));
   }
+  .ic{width:24px; height:24px; display:block}
+  .ic .t2{opacity:.35}
+  .chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:9px}
+  .chip{
+    font-size:12px; font-weight:650; padding:5px 10px; border-radius:99px;
+    background:var(--surface-2); color:var(--ink-2); font-variant-numeric:tabular-nums;
+  }
+  .chip:active{background:var(--baseline)}
   .habit-main{flex:1; min-width:0}
   .habit-name{font-weight:650; font-size:16px; letter-spacing:-.1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .habit-sub{font-size:13px; color:var(--muted); display:flex; align-items:center; gap:6px; margin-top:1px}
@@ -124,12 +132,14 @@
   .limit-note{font-size:12px; margin-top:6px; color:var(--muted)}
   .limit-note.over{color:var(--crit); font-weight:600}
   .empty-state{padding:48px 24px; text-align:center; color:var(--muted)}
-  .empty-state .big{font-size:40px; margin-bottom:8px}
+  .empty-state .big{display:flex; justify-content:center; margin-bottom:10px}
+  .empty-state .big .ic{width:40px; height:40px}
 
   /* ---------- trends ---------- */
   .section-title{font-size:13px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin:18px 0 8px}
   .trend-head{display:flex; align-items:center; gap:10px; margin-bottom:10px}
-  .trend-head .emoji-chip{width:36px;height:36px;font-size:19px;border-radius:11px}
+  .trend-head .icon-chip{width:36px;height:36px;border-radius:11px}
+  .trend-head .icon-chip .ic{width:19px;height:19px}
   .tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px}
   .tile{background:var(--surface-2); border-radius:12px; padding:9px 11px}
   .tile .t-label{font-size:11px; color:var(--muted); font-weight:600}
@@ -154,8 +164,9 @@
   .manage-row .habit-main{padding:2px 0}
   .icon-btn{
     width:38px; height:38px; flex:none; border-radius:12px; background:var(--surface-2);
-    display:grid; place-items:center; font-size:16px; color:var(--ink-2);
+    display:grid; place-items:center; color:var(--ink-2);
   }
+  .icon-btn .ic{width:17px; height:17px}
   .add-btn{
     width:100%; padding:14px; border-radius:18px; border:1.5px dashed var(--baseline);
     color:var(--ink-2); font-weight:650; font-size:15px; margin-top:2px;
@@ -183,6 +194,7 @@
     font-size:11px; font-weight:600; color:var(--muted);
   }
   .tab .t-ico{font-size:21px; line-height:1; filter:grayscale(1); opacity:.55; transition:.15s}
+  .tab .t-ico .ic{width:22px; height:22px}
   .tab.active{color:var(--ink)}
   .tab.active .t-ico{filter:none; opacity:1; transform:translateY(-1px)}
 
@@ -205,15 +217,19 @@
     width:100%; padding:12px 13px; border-radius:13px; border:1px solid var(--border);
     background:var(--page); color:var(--ink); font:inherit; font-size:16px;
   }
-  .emoji-quick{display:flex; gap:6px; overflow-x:auto; padding:6px 0 2px; scrollbar-width:none}
-  .emoji-quick::-webkit-scrollbar{display:none}
-  .emoji-quick button{font-size:22px; width:40px; height:40px; flex:none; border-radius:11px; background:var(--surface-2)}
+  .icon-grid{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:4px}
+  .icon-grid button{
+    height:44px; border-radius:12px; background:var(--surface-2); color:var(--ink-2);
+    display:grid; place-items:center;
+  }
+  .icon-grid button .ic{width:22px; height:22px}
+  .icon-grid button.on{background:var(--accent); color:#fff}
   .seg{display:grid; grid-template-columns:repeat(4,1fr); gap:5px}
   .seg button{
     padding:9px 4px; border-radius:11px; background:var(--surface-2); font-size:12px; font-weight:650; color:var(--ink-2);
-    display:flex; flex-direction:column; gap:1px; align-items:center;
+    display:flex; flex-direction:column; gap:3px; align-items:center;
   }
-  .seg button span{font-size:17px}
+  .seg button .ic{width:18px; height:18px}
   .seg button.on{background:var(--accent); color:#fff}
   .two-col{display:grid; grid-template-columns:1fr 1fr; gap:10px}
   .primary-btn{
@@ -278,8 +294,8 @@
 <nav class="tabs">
   <div class="tabs-inner">
     <button class="tab active" data-view="today"><span class="t-ico">🔥</span>Today</button>
-    <button class="tab" data-view="trends"><span class="t-ico">📈</span>Trends</button>
-    <button class="tab" data-view="manage"><span class="t-ico">⚙️</span>Habits</button>
+    <button class="tab" data-view="trends"><span class="t-ico" data-tab-icon="chart"></span>Trends</button>
+    <button class="tab" data-view="manage"><span class="t-ico" data-tab-icon="sliders"></span>Habits</button>
   </div>
 </nav>
 
@@ -290,23 +306,61 @@
 
 <script>
 'use strict';
+/* =============== two-tone icon set ===============
+   Every glyph is two tones of the habit's accent: .t1 solid, .t2 at 35%. */
+const ICONS = {
+  spark: '<path class="t1" d="M12 2.5C12.6 7 13.5 8.4 18 9.5 13.5 10.6 12.6 12 12 16.5 11.4 12 10.5 10.6 6 9.5 10.5 8.4 11.4 7 12 2.5z"/><path class="t2" d="M17.5 13.5c.3 1.8.7 2.4 2.5 2.75-1.8.35-2.2.95-2.5 2.75-.3-1.8-.7-2.4-2.5-2.75 1.8-.35 2.2-.95 2.5-2.75z"/>',
+  bed: '<rect class="t2" x="2" y="10.5" width="20" height="7" rx="2.2"/><rect class="t2" x="2.8" y="17" width="2.2" height="3.2" rx="1"/><rect class="t2" x="19" y="17" width="2.2" height="3.2" rx="1"/><rect class="t1" x="4" y="6.8" width="6.5" height="4.6" rx="2"/><path class="t1" d="M12 7.4h6.5A3.5 3.5 0 0 1 22 10.9v.5H12z"/>',
+  scale: '<path class="t2" d="M12 4.2a8.8 8.8 0 0 0-6.6 14.6h13.2A8.8 8.8 0 0 0 12 4.2z"/><rect class="t1" x="11.1" y="6.4" width="1.8" height="7.6" rx=".9" transform="rotate(38 12 13.3)"/><circle class="t1" cx="12" cy="13.3" r="2"/>',
+  drop: '<path class="t1" d="M12 2.8S5.2 10 5.2 14.6a6.8 6.8 0 0 0 13.6 0C18.8 10 12 2.8 12 2.8z"/><circle class="t2" cx="9.4" cy="14.9" r="2.1"/>',
+  drink: '<path class="t2" d="M5 6.5h10.5V17a2.5 2.5 0 0 1-2.5 2.5H7.5A2.5 2.5 0 0 1 5 17z"/><path class="t1" d="M15.5 8.6h1.7a3.15 3.15 0 0 1 0 6.3h-1.7v-2h1.6a1.15 1.15 0 0 0 0-2.3h-1.6z"/><circle class="t1" cx="7.1" cy="5.9" r="2"/><circle class="t1" cx="10.3" cy="4.9" r="2.3"/><circle class="t1" cx="13.5" cy="5.9" r="2"/>',
+  run: '<circle class="t1" cx="14.7" cy="4.7" r="2"/><g class="t1" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M14.2 8.4l-3.5 2.5 1.7 3.4-3.1 4.3"/><path d="M12.4 14.3l3.5 1.1 1.5 3.5"/><path d="M14.2 8.4l2.7 1.9 2.5-.7"/></g><g class="t2" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M3.4 9h3M2.4 13h3"/></g>',
+  book: '<path class="t1" d="M12 6.2C9.4 4.6 6 4.4 3 5.3V18c3-.9 6.4-.7 9 .9z"/><path class="t2" d="M12 6.2c2.6-1.6 6-1.8 9-.9V18c-3-.9-6.4-.7-9 .9z"/>',
+  moon: '<path class="t1" d="M14.8 3.2A8.8 8.8 0 1 0 20.8 15 7.2 7.2 0 0 1 14.8 3.2z"/><path class="t2" d="M17.8 3.4c.25 1.55.62 2.05 2.17 2.35-1.55.3-1.92.8-2.17 2.35-.25-1.55-.62-2.05-2.17-2.35 1.55-.3 1.92-.8 2.17-2.35z"/>',
+  pill: '<g transform="rotate(-35 12 12)"><rect class="t2" x="4" y="8.7" width="16" height="6.6" rx="3.3"/><rect class="t1" x="4" y="8.7" width="8" height="6.6" rx="3.3"/></g>',
+  coffee: '<path class="t2" d="M4 8h12v6.5A4.5 4.5 0 0 1 11.5 19h-3A4.5 4.5 0 0 1 4 14.5z"/><path class="t1" d="M16 9.5h1.6a2.9 2.9 0 0 1 0 5.8H16v-2h1.5a.9.9 0 0 0 0-1.8H16z"/><g class="t1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M8 3.4v2.2M12 3.4v2.2"/></g>',
+  dumbbell: '<rect class="t1" x="2.6" y="7.6" width="3.4" height="8.8" rx="1.4"/><rect class="t1" x="18" y="7.6" width="3.4" height="8.8" rx="1.4"/><rect class="t2" x="6.4" y="10.3" width="11.2" height="3.4" rx="1.6"/>',
+  leaf: '<path class="t2" d="M20.5 3.5C9.5 3.5 3.8 9.8 3.8 19.8c10.5 0 16.7-6.3 16.7-16.3z"/><path class="t1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" d="M4.6 19.4C8.5 13.5 12.5 9.5 19 5"/>',
+  pen: '<path class="t2" d="M13.2 6.2l4.6 4.6-8.2 8.2H5v-4.6z"/><path class="t1" d="M14.6 4.8l1.2-1.2a2.55 2.55 0 0 1 3.6 3.6l-1.2 1.2z"/>',
+  music: '<path class="t2" d="M8 6.2l10.6-2.1v3.4L8 9.6z"/><rect class="t1" x="8" y="7.6" width="1.7" height="10.2" rx=".85"/><rect class="t1" x="16.9" y="5.7" width="1.7" height="10.2" rx=".85"/><circle class="t1" cx="7" cy="17.6" r="2.6"/><circle class="t1" cx="15.9" cy="15.7" r="2.6"/>',
+  coin: '<ellipse class="t2" cx="12" cy="15.2" rx="8.2" ry="4.3"/><ellipse class="t1" cx="12" cy="8.8" rx="8.2" ry="4.3"/>',
+  sun: '<circle class="t1" cx="12" cy="12" r="4.3"/><g class="t2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6"/></g>',
+  heart: '<path class="t1" d="M12 20.2C5.4 15.6 3 12.3 3 8.9A4.9 4.9 0 0 1 12 6.2 4.9 4.9 0 0 1 21 8.9c0 3.4-2.4 6.7-9 11.3z"/><circle class="t2" cx="7.4" cy="8.4" r="1.8"/>',
+  flame: '<path class="t1" d="M12 2.4c1.1 4.6-5 7-5 12.8a5 5 0 0 0 10 0c0-2.5-1.2-4.1-2.4-5.9-.5 2.4-2.2 3-2.2 3s1.2-5.1-.4-9.9z"/><path class="t2" d="M12 21.4a3.5 3.5 0 0 1-3.5-3.5c0-2 1.75-3.2 3.5-5.1 1.75 1.9 3.5 3.1 3.5 5.1A3.5 3.5 0 0 1 12 21.4z"/>',
+  check: '<circle class="t2" cx="12" cy="12" r="9"/><path class="t1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="M7.6 12.4l3 3 5.8-6.4"/>',
+  ban: '<circle class="t2" cx="12" cy="12" r="9"/><path class="t1" d="M5.6 4.2l14.2 14.2-1.4 1.4L4.2 5.6z"/>',
+  chart: '<rect class="t2" x="3" y="13" width="4" height="7" rx="1.3"/><rect class="t1" x="10" y="9" width="4" height="11" rx="1.3"/><rect class="t2" x="17" y="4.5" width="4" height="15.5" rx="1.3"/>',
+  sliders: '<g class="t2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></g><circle class="t1" cx="9" cy="7" r="2.3"/><circle class="t1" cx="15" cy="12" r="2.3"/><circle class="t1" cx="7" cy="17" r="2.3"/>',
+  edit: '<path class="t2" d="M13.2 6.2l4.6 4.6-8.2 8.2H5v-4.6z"/><path class="t1" d="M14.6 4.8l1.2-1.2a2.55 2.55 0 0 1 3.6 3.6l-1.2 1.2z"/>',
+  pause: '<rect class="t1" x="6" y="4.5" width="4" height="15" rx="1.6"/><rect class="t2" x="14" y="4.5" width="4" height="15" rx="1.6"/>',
+  play: '<path class="t1" d="M8 4.8a1.4 1.4 0 0 1 2.1-1.2l10 6.2a1.4 1.4 0 0 1 0 2.4l-10 6.2A1.4 1.4 0 0 1 8 17.2z" transform="translate(-1.5 0)"/><rect class="t2" x="4" y="4.5" width="2.4" height="15" rx="1.2"/>',
+};
+function icon(name) { return `<svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${ICONS[name] || ICONS.spark}</svg>`; }
+
 /* =============== state =============== */
 const STORE_KEY = 'ember.v1';
 const HUES = 8;
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
 
 const seedHabits = () => ([
-  { id: uid(), name: 'Make the bed', emoji: '🛏️', type: 'check',   goal: 1, unit: '',        hue: 0 },
-  { id: uid(), name: 'Weigh in',     emoji: '⚖️', type: 'measure', goal: 0, unit: 'lbs',     hue: 6 },
-  { id: uid(), name: 'Water',        emoji: '💧', type: 'count',   goal: 8, unit: 'glasses', hue: 4 },
-  { id: uid(), name: 'Drinks',       emoji: '🍺', type: 'limit',   goal: 2, unit: 'drinks',  hue: 3 },
+  { id: uid(), name: 'Make the bed', icon: 'bed',   type: 'check',   goal: 1, unit: '',        hue: 0 },
+  { id: uid(), name: 'Weigh in',     icon: 'scale', type: 'measure', goal: 0, unit: 'lbs',     hue: 6 },
+  { id: uid(), name: 'Water',        icon: 'drop',  type: 'count',   goal: 8, unit: 'glasses', hue: 4 },
+  { id: uid(), name: 'Drinks',       icon: 'drink', type: 'limit',   goal: 2, unit: 'drinks',  hue: 3 },
 ].map(h => ({ ...h, createdAt: todayKey(), archived: false })));
 
+const EMOJI2ICON = { '🛏️':'bed','⚖️':'scale','💧':'drop','🍺':'drink','🏃':'run','🚶':'run','📖':'book','😴':'moon','💊':'pill','☕':'coffee','💪':'dumbbell','🥗':'leaf','✍️':'pen','🎸':'music','💰':'coin','🌞':'sun','🧘':'heart','🧹':'spark','🦷':'spark','🚭':'ban','✨':'spark' };
 let state = load();
 function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (raw) { const s = JSON.parse(raw); if (s && s.version === 1 && Array.isArray(s.habits)) return s; }
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s && s.version === 1 && Array.isArray(s.habits)) {
+        s.habits.forEach(h => { if (!h.icon) { h.icon = EMOJI2ICON[h.emoji] || 'spark'; delete h.emoji; } });
+        return s;
+      }
+    }
   } catch (e) {}
   return { version: 1, habits: seedHabits(), logs: {}, settings: {} };
 }
@@ -328,6 +382,14 @@ function setVal(hid, key, v) {
   save();
 }
 
+/* =============== limit-habit time entries ===============
+   A "stay under" day is an array of clock times, one per unit consumed
+   ("14:05"; null when the time is unknown, e.g. backfilled days).
+   Older numeric values still count via limitCount. */
+function limitTimes(v) { return Array.isArray(v) ? v.slice() : Array(v || 0).fill(null); }
+function limitCount(v) { return Array.isArray(v) ? v.length : (v || 0); }
+function nowHM() { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+
 /* =============== streak logic =============== */
 /* Success rules: check → done at least once · count → reached goal ·
    limit → stayed at/under the cap (an unlogged day counts as 0, i.e. success) ·
@@ -336,7 +398,7 @@ function successOn(h, key) {
   const v = getVal(h.id, key);
   if (h.type === 'check')   return (v || 0) >= 1;
   if (h.type === 'count')   return (v || 0) >= h.goal;
-  if (h.type === 'limit')   return (v === undefined ? 0 : v) <= h.goal;
+  if (h.type === 'limit')   return limitCount(v) <= h.goal;
   if (h.type === 'measure') return v !== undefined;
   return false;
 }
@@ -427,7 +489,7 @@ function renderHeader() {
 function renderToday() {
   const box = $('#today-cards');
   const hs = activeHabits();
-  if (!hs.length) { box.innerHTML = `<div class="empty-state"><div class="big">🌱</div>No habits yet.<br>Add your first one in the <b>Habits</b> tab.</div>`; return; }
+  if (!hs.length) { box.innerHTML = `<div class="empty-state"><div class="big">${icon('spark')}</div>No habits yet.<br>Add your first one in the <b>Habits</b> tab.</div>`; return; }
   box.innerHTML = hs.map(h => cardHTML(h)).join('');
   hs.forEach(h => bindCard(h));
 }
@@ -443,11 +505,13 @@ function cardHTML(h) {
     control = stepperHTML(n, `of ${h.goal}`);
     extra = `<div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${hueVar(h)}"></div></div>`;
   } else if (h.type === 'limit') {
-    const n = v === undefined ? 0 : v, over = n > h.goal;
+    const times = limitTimes(v), n = times.length, over = n > h.goal;
     const pct = Math.min(100, 100 * n / Math.max(h.goal, 1));
+    const chips = n ? `<div class="chips">${times.map((t, i) =>
+      `<button class="chip" data-act="time" data-i="${i}" aria-label="Edit entry ${i + 1} time">${t || 'time?'}</button>`).join('')}</div>` : '';
     control = stepperHTML(n, `of ≤${h.goal}`);
     extra = `<div class="bar-track"><div class="bar-fill ${over ? 'over' : ''}" style="width:${over ? 100 : pct}%; ${over ? '' : `background:${hueVar(h)}`}"></div></div>
-      <div class="limit-note ${over ? 'over' : ''}">${over ? `${n - h.goal} over your limit` : `${h.goal - n} left under your limit`}</div>`;
+      <div class="limit-note ${over ? 'over' : ''}">${over ? `${n - h.goal} over your limit` : `${h.goal - n} left under your limit`}</div>${chips}`;
   } else { // measure
     control = v !== undefined
       ? `<button class="measure-btn" data-act="measure">${fmtNum(v)}<small>${esc(h.unit || '')}</small></button>`
@@ -455,7 +519,7 @@ function cardHTML(h) {
   }
   return `<div class="card" data-hid="${h.id}" style="--accent:${hueVar(h)}">
     <div class="habit-row">
-      <div class="emoji-chip">${h.emoji}</div>
+      <div class="icon-chip">${icon(h.icon)}</div>
       <div class="habit-main"><div class="habit-name">${esc(h.name)}</div><div class="habit-sub">${flame}</div></div>
       ${control}
     </div>${extra}</div>`;
@@ -471,13 +535,21 @@ function bindCard(h) {
   const card = document.querySelector(`.card[data-hid="${h.id}"]`);
   if (!card) return;
   card.addEventListener('click', e => {
-    const act = e.target.closest('[data-act]')?.dataset.act;
-    if (!act) return;
+    const btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    const act = btn.dataset.act;
     const v = getVal(h.id, viewDate);
     if (act === 'toggle') setVal(h.id, viewDate, v >= 1 ? undefined : 1);
-    if (act === 'inc') setVal(h.id, viewDate, (v || 0) + 1);
-    if (act === 'dec') setVal(h.id, viewDate, Math.max(0, (v || 0) - 1));
+    if (act === 'inc') {
+      if (h.type === 'limit') { const a = limitTimes(v); a.push(viewDate === todayKey() ? nowHM() : null); setVal(h.id, viewDate, a); }
+      else setVal(h.id, viewDate, (v || 0) + 1);
+    }
+    if (act === 'dec') {
+      if (h.type === 'limit') { const a = limitTimes(v); a.pop(); setVal(h.id, viewDate, a); }
+      else setVal(h.id, viewDate, Math.max(0, (v || 0) - 1));
+    }
     if (act === 'measure') { openMeasureSheet(h); return; }
+    if (act === 'time') { openTimeSheet(h, +btn.dataset.i); return; }
     render();
     if (act === 'toggle' && getVal(h.id, viewDate) >= 1) {
       const cs = currentStreak(h);
@@ -498,14 +570,14 @@ const ramp = t => { const r = isDark() ? RAMP_DARK : RAMP_LIGHT; return r[Math.m
 function renderTrends() {
   const box = $('#trends-body');
   const hs = activeHabits();
-  if (!hs.length) { box.innerHTML = `<div class="empty-state"><div class="big">📈</div>Add a habit to see trends.</div>`; return; }
+  if (!hs.length) { box.innerHTML = `<div class="empty-state"><div class="big">${icon('chart')}</div>Add a habit to see trends.</div>`; return; }
   box.innerHTML = hs.map(h => {
     const cs = currentStreak(h), bs = bestStreak(h), r = rate30(h);
     let chart = '';
     if (h.type === 'measure') chart = lineChartHTML(h);
     else if (h.type === 'count' || h.type === 'limit') chart = barChartHTML(h);
     return `<div class="card" style="--accent:${hueVar(h)}; margin:10px 0">
-      <div class="trend-head"><div class="emoji-chip">${h.emoji}</div><h3>${esc(h.name)}</h3></div>
+      <div class="trend-head"><div class="icon-chip">${icon(h.icon)}</div><h3>${esc(h.name)}</h3></div>
       <div class="tiles">
         <div class="tile"><div class="t-label">Streak</div><div class="t-value">${cs > 0 ? '🔥 ' : ''}${cs}<span class="u"> d</span></div></div>
         <div class="tile"><div class="t-label">Best</div><div class="t-value">${bs}<span class="u"> d</span></div></div>
@@ -538,9 +610,10 @@ function heatmapHTML(h) {
       if (h.type === 'check') { if (ok) { style = `background:${ramp(1)}`; sub = 'Done ✓'; } else sub = 'Missed'; }
       else if (h.type === 'count') { const n = v || 0; if (n > 0) { style = `background:${ramp(Math.min(1, n / h.goal))}`; } sub = `${n}/${h.goal} ${h.unit || ''}`; }
       else if (h.type === 'limit') {
-        const n = v === undefined ? 0 : v;
-        if (ok) { style = `background:${ramp(1 - Math.min(1, n / Math.max(h.goal, 1)) * 0.6)}`; sub = `${n} ${h.unit || ''} — under limit ✓`; }
-        else { cls = 'x'; sub = `${n} ${h.unit || ''} — over limit`; }
+        const n = limitCount(v);
+        const ts = limitTimes(v).filter(Boolean).join(' · ');
+        if (ok) { style = `background:${ramp(1 - Math.min(1, n / Math.max(h.goal, 1)) * 0.6)}`; sub = `${n} ${h.unit || ''} — under limit ✓${ts ? ' · ' + ts : ''}`; }
+        else { cls = 'x'; sub = `${n} ${h.unit || ''} — over limit${ts ? ' · ' + ts : ''}`; }
       }
       else if (h.type === 'measure') { if (ok) { style = `background:${ramp(1)}`; sub = `${fmtNum(v)} ${h.unit || ''}`; } }
       cells += `<div class="heat-cell ${cls}" style="${style}" data-tip="${esc(label)}" data-sub="${esc(sub)}"></div>`;
@@ -617,7 +690,10 @@ function barChartHTML(h) {
   const iw = W - P.l - P.r, ih = H - P.t - P.b;
   const floor = logFloor(h);
   const days = [];
-  for (let i = N - 1; i >= 0; i--) { const d = addDays(today, -i); const k = toKey(d); days.push({ k, d, v: k < floor ? null : (getVal(h.id, k) ?? 0) }); }
+  for (let i = N - 1; i >= 0; i--) {
+    const d = addDays(today, -i); const k = toKey(d); const raw = getVal(h.id, k);
+    days.push({ k, d, raw, v: k < floor ? null : (h.type === 'limit' ? limitCount(raw) : (raw ?? 0)) });
+  }
   const maxV = Math.max(h.goal, ...days.map(x => x.v || 0), 1);
   const slot = iw / N, bw = Math.min(24, slot - 4);
   const Y = v => P.t + ih * (1 - v / maxV);
@@ -629,7 +705,8 @@ function barChartHTML(h) {
     if (x.v === null) return;
     const over = h.type === 'limit' && x.v > h.goal;
     const fill = over ? 'var(--crit)' : hueVar(h);
-    const tipSub = h.type === 'limit' ? `${x.v} ${h.unit || ''}${over ? ' — over limit' : ' — under ✓'}` : `${x.v}/${h.goal} ${h.unit || ''}`;
+    const ts = h.type === 'limit' ? limitTimes(x.raw).filter(Boolean).join(' · ') : '';
+    const tipSub = h.type === 'limit' ? `${x.v} ${h.unit || ''}${over ? ' — over limit' : ' — under ✓'}${ts ? ' · ' + ts : ''}` : `${x.v}/${h.goal} ${h.unit || ''}`;
     if (x.v === 0) {
       bars += `<rect x="${(cx - bw / 2).toFixed(1)}" y="${P.t + ih - 2}" width="${bw.toFixed(1)}" height="2" rx="1" fill="var(--baseline)" data-tip="${esc(FMT_MD.format(x.d))}" data-sub="${esc(tipSub)}"/>`;
       return;
@@ -672,10 +749,10 @@ document.addEventListener('pointerdown', e => { if (!e.target.closest('[data-tip
 
 /* =============== render: manage =============== */
 const TYPE_META = {
-  check:   { label: 'Check off', ico: '✓',  hint: 'Done / not done — e.g. make the bed' },
-  count:   { label: 'Build up',  ico: '📈', hint: 'Count up to a daily goal — e.g. water' },
-  limit:   { label: 'Stay under',ico: '🚫', hint: 'Cap it — success is staying at or under the limit' },
-  measure: { label: 'Track #',   ico: '⚖️', hint: 'Log a number each day — e.g. weight' },
+  check:   { label: 'Check off', ico: 'check', hint: 'Done / not done — e.g. make the bed' },
+  count:   { label: 'Build up',  ico: 'chart', hint: 'Count up to a daily goal — e.g. water' },
+  limit:   { label: 'Stay under',ico: 'ban',   hint: 'Cap it — success is staying at or under the limit. Each + stamps the time.' },
+  measure: { label: 'Track #',   ico: 'scale', hint: 'Log a number each day — e.g. weight' },
 };
 function renderManage() {
   const box = $('#manage-cards');
@@ -686,13 +763,13 @@ function renderManage() {
                    h.type === 'measure' ? `logs ${h.unit || 'a number'}` : 'daily check';
     return `<div class="card" style="--accent:${hueVar(h)}; ${h.archived ? 'opacity:.55' : ''}">
       <div class="manage-row">
-        <div class="emoji-chip">${h.emoji}</div>
+        <div class="icon-chip">${icon(h.icon)}</div>
         <div class="habit-main">
           <div class="habit-name">${esc(h.name)} ${h.archived ? '<span class="archived-tag">paused</span>' : ''}</div>
-          <div class="habit-sub">${meta.ico} ${meta.label} · ${esc(detail)}</div>
+          <div class="habit-sub">${meta.label} · ${esc(detail)}</div>
         </div>
-        <button class="icon-btn" data-edit="${h.id}" aria-label="Edit ${esc(h.name)}">✎</button>
-        <button class="icon-btn" data-arch="${h.id}" aria-label="${h.archived ? 'Resume' : 'Pause'} ${esc(h.name)}">${h.archived ? '▶' : '⏸'}</button>
+        <button class="icon-btn" data-edit="${h.id}" aria-label="Edit ${esc(h.name)}">${icon('edit')}</button>
+        <button class="icon-btn" data-arch="${h.id}" aria-label="${h.archived ? 'Resume' : 'Pause'} ${esc(h.name)}">${icon(h.archived ? 'play' : 'pause')}</button>
       </div></div>`;
   }).join('');
   box.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openHabitSheet(state.habits.find(h => h.id === b.dataset.edit))));
@@ -703,22 +780,23 @@ function renderManage() {
 }
 
 /* =============== bottom sheet: add / edit habit =============== */
-const EMOJI_QUICK = ['🛏️','⚖️','💧','🍺','🏃','🚶','📖','🧘','💊','🚭','☕','🦷','😴','🥗','💪','✍️','🧹','🎸','💰','🌞'];
+const ICON_PICK = ['bed','scale','drop','drink','coffee','leaf','run','dumbbell','heart','moon','pill','book','pen','music','coin','sun','flame','spark'];
 let sheetType = 'check';
 function openHabitSheet(h) {
   sheetType = h ? h.type : 'check';
+  let sheetIcon = h ? h.icon : 'spark';
   const sheet = $('#sheet');
   sheet.innerHTML = `
     <div class="grabber"></div>
     <h2>${h ? 'Edit habit' : 'New habit'}</h2>
     <div class="field"><label for="f-name">Name</label>
       <input type="text" id="f-name" placeholder="e.g. Morning run" value="${h ? esc(h.name) : ''}" maxlength="40"></div>
-    <div class="field"><label for="f-emoji">Icon</label>
-      <input type="text" id="f-emoji" value="${h ? h.emoji : '✨'}" maxlength="4" style="width:76px; text-align:center; font-size:22px">
-      <div class="emoji-quick">${EMOJI_QUICK.map(e => `<button type="button" data-em="${e}">${e}</button>`).join('')}</div></div>
+    <div class="field"><label>Icon</label>
+      <div class="icon-grid" id="f-icon">${ICON_PICK.map(n =>
+        `<button type="button" data-ic="${n}" class="${n === sheetIcon ? 'on' : ''}" aria-label="${n}">${icon(n)}</button>`).join('')}</div></div>
     <div class="field"><label>Type</label>
       <div class="seg" id="f-type">${Object.entries(TYPE_META).map(([k, m]) =>
-        `<button type="button" data-t="${k}" class="${k === sheetType ? 'on' : ''}"><span>${m.ico}</span>${m.label}</button>`).join('')}</div>
+        `<button type="button" data-t="${k}" class="${k === sheetType ? 'on' : ''}">${icon(m.ico)}${m.label}</button>`).join('')}</div>
       <div class="hint" id="type-hint"></div></div>
     <div class="two-col">
       <div class="field" id="f-goal-wrap"><label for="f-goal" id="f-goal-label">Daily goal</label>
@@ -737,16 +815,19 @@ function openHabitSheet(h) {
   };
   syncType();
   sheet.querySelectorAll('#f-type button').forEach(b => b.addEventListener('click', () => { sheetType = b.dataset.t; syncType(); }));
-  sheet.querySelectorAll('[data-em]').forEach(b => b.addEventListener('click', () => { $('#f-emoji').value = b.dataset.em; }));
+  sheet.querySelectorAll('#f-icon [data-ic]').forEach(b => b.addEventListener('click', () => {
+    sheetIcon = b.dataset.ic;
+    sheet.querySelectorAll('#f-icon [data-ic]').forEach(x => x.classList.toggle('on', x === b));
+  }));
   $('#f-save').addEventListener('click', () => {
     const name = $('#f-name').value.trim();
     if (!name) { $('#f-name').focus(); return; }
     const goal = Math.max(sheetType === 'limit' ? 0 : 1, parseInt($('#f-goal').value, 10) || 1);
-    const fields = { name, emoji: ($('#f-emoji').value.trim() || '✨'), type: sheetType, goal, unit: $('#f-unit').value.trim() };
+    const fields = { name, icon: sheetIcon, type: sheetType, goal, unit: $('#f-unit').value.trim() };
     if (h) Object.assign(h, fields);
     else state.habits.push({ id: uid(), ...fields, hue: state.habits.length % HUES, createdAt: todayKey(), archived: false });
     save(); closeSheet(); render();
-    toast(h ? 'Saved' : `${fields.emoji} Habit added`);
+    toast(h ? 'Saved' : 'Habit added');
   });
   if (h) $('#f-delete').addEventListener('click', () => {
     if (!confirm(`Delete “${h.name}” and all of its history? This can’t be undone.`)) return;
@@ -765,7 +846,7 @@ function openMeasureSheet(h) {
   const lastKnown = (() => { for (let i = 0; i < 365; i++) { const v = getVal(h.id, toKey(addDays(fromKey(viewDate), -i))); if (v !== undefined) return v; } return ''; })();
   sheet.innerHTML = `
     <div class="grabber"></div>
-    <h2>${h.emoji} ${esc(h.name)} — ${viewDate === todayKey() ? 'today' : FMT_MD.format(fromKey(viewDate))}</h2>
+    <h2>${esc(h.name)} — ${viewDate === todayKey() ? 'today' : FMT_MD.format(fromKey(viewDate))}</h2>
     <div class="field">
       <input type="number" id="m-val" class="big-input" inputmode="decimal" step="0.1" placeholder="${lastKnown || '0.0'}" value="${existing ?? ''}">
       <div class="hint" style="text-align:center">${esc(h.unit || '')}${lastKnown !== '' ? ` · last: ${fmtNum(lastKnown)}` : ''}</div>
@@ -783,6 +864,31 @@ function openMeasureSheet(h) {
   if (clr) clr.addEventListener('click', () => { setVal(h.id, viewDate, undefined); closeSheet(); render(); });
   openSheet();
   setTimeout(() => { const i = $('#m-val'); i.focus(); i.select(); }, 250);
+}
+
+/* --- time entry sheet (limit habits: adjust when each one was consumed) --- */
+function openTimeSheet(h, i) {
+  const sheet = $('#sheet');
+  const arr = limitTimes(getVal(h.id, viewDate));
+  if (!(i >= 0 && i < arr.length)) return;
+  sheet.innerHTML = `
+    <div class="grabber"></div>
+    <h2>${esc(h.name)} #${i + 1} — when?</h2>
+    <div class="field">
+      <input type="time" id="t-val" class="big-input" value="${arr[i] || ''}">
+      <div class="hint" style="text-align:center">${viewDate === todayKey() ? 'today' : FMT_MD.format(fromKey(viewDate))}</div>
+    </div>
+    <button class="primary-btn" id="t-save">Save time</button>
+    <button class="danger-link" id="t-remove">Remove this entry</button>`;
+  $('#t-save').addEventListener('click', () => {
+    arr[i] = $('#t-val').value || null;
+    setVal(h.id, viewDate, arr); closeSheet(); render();
+  });
+  $('#t-remove').addEventListener('click', () => {
+    arr.splice(i, 1);
+    setVal(h.id, viewDate, arr); closeSheet(); render();
+  });
+  openSheet();
 }
 
 function openSheet() { document.body.classList.add('sheet-open'); }
@@ -815,7 +921,7 @@ $('#reset-btn').addEventListener('click', () => {
   if (!confirm('Erase ALL habits and history on this device?')) return;
   if (!confirm('Really sure? There is no undo.')) return;
   state = { version: 1, habits: seedHabits(), logs: {}, settings: {} };
-  save(); render(); toast('Fresh start 🌱');
+  save(); render(); toast('Fresh start');
 });
 
 /* =============== boot =============== */
@@ -826,6 +932,7 @@ function render() {
   else if (curView === 'trends') renderTrends();
   else renderManage();
 }
+document.querySelectorAll('[data-tab-icon]').forEach(el => { el.innerHTML = icon(el.dataset.tabIcon); });
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', render);
 new MutationObserver(render).observe(document.documentElement, { attributeFilter: ['data-theme'] });
 render();

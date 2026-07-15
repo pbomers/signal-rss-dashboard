@@ -17,6 +17,9 @@ Past days can be backfilled with the ‹ › arrows on the Today screen.
 
 ## Features
 
+- "Stay under" entries are time-stamped: each **+** records the clock time; tap
+  a time chip to adjust or remove that entry (backfilled days show `time?`)
+- Two-tone SVG icon set (accent + 35% tint) — no emoji except the streak 🔥
 - Current/best streaks, 30-day completion rate, 12-week heatmap per habit
 - 90-day trend line for measured habits (weight), 14-day bars vs. goal/limit
 - Add/edit/pause habits, JSON export/import backup
