@@ -28,8 +28,8 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  // Never cache the sync API — always talk to the network (and let non-GET methods pass through).
-  if (new URL(e.request.url).pathname.startsWith('/api/')) return;
+  // Cross-origin (Supabase sync) requests always go straight to the network, never cached.
+  if (new URL(e.request.url).origin !== location.origin) return;
   if (e.request.method !== 'GET') return;
   // Network-first for the page itself so updates land; cache fallback keeps it offline-capable.
   if (e.request.mode === 'navigate') {

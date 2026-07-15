@@ -1041,7 +1041,7 @@ $('#lock-form').addEventListener('submit', async e => {
   if (ok) {
     unlockedThisSession = true;
     if ($('#lock-remember').checked) rememberDevice(30);
-    try { setToken(await sha256hex(pass)); } catch (e) {}
+    try { setToken(await deriveOwner(pass)); } catch (e) {}
     $('#lock-pass').value = ''; $('#lock-err').textContent = '';
     hideLock();
     syncPull();                       // same passcode -> pull this account's cloud data
@@ -1101,7 +1101,7 @@ function openLockSheet(mode) {
     state.settings.lock = { salt, iterations, hash: await passHash(p, salt, iterations) };
     save();
     unlockedThisSession = true; rememberDevice(30);   // don't lock the device that just set it
-    try { setToken(await sha256hex(p)); } catch (e) {}
+    try { setToken(await deriveOwner(p)); } catch (e) {}
     closeSheet(); renderLockActions();
     toast(mode === 'set' ? 'Passcode set 🔒' : 'Passcode changed');
     syncPull({ preferRemote: true });   // adopt existing cloud data for this passcode if any; else seed it
@@ -1110,19 +1110,28 @@ function openLockSheet(mode) {
   setTimeout(() => $(mode === 'set' ? '#lk-new' : '#lk-cur').focus(), 250);
 }
 
-/* =============== cloud sync (Supabase via the /api/sync proxy) ===============
-   Source of truth is Supabase; localStorage is the offline copy. The sync token is
-   sha256(passcode) — the same secret that gates the app locally also keys the cloud
-   blob, so there's no separate login. Sync only runs once a passcode is set, and the
-   same passcode on another device pulls the same data. Whole-state last-write-wins by
-   an opaque server revision; `dirty` marks unpushed local edits so offline changes
-   survive and win on reconnect. */
-const SYNC_URL = '/api/sync';
+/* =============== cloud sync (direct to Supabase) ===============
+   Source of truth is Supabase; localStorage is the offline copy. The browser calls
+   Supabase directly with the public publishable key; a row-level-security policy
+   scopes every request to the row whose `owner` matches the x-ember-owner header
+   (= PBKDF2(passcode)), so there's no login and no server. Sync only runs once a
+   passcode is set, and the same passcode on another device pulls the same data.
+   Whole-state last-write-wins by an opaque server revision; `dirty` marks unpushed
+   local edits so offline changes survive and win on reconnect. */
+const SB_URL = 'https://fuzisxdefycuwkhbuynx.supabase.co';
+const SB_KEY = 'sb_publishable_7J6VRBgBoNskWFoLdR6mFg_WrSuueef';   // publishable key — safe in client; RLS is the guard
+const SB_REST = SB_URL + '/rest/v1/ember_state';
+const SB_HEAD = () => ({ apikey: SB_KEY, authorization: 'Bearer ' + SB_KEY });
 const TOKEN_KEY = 'ember.token';
 const getToken = () => { try { return localStorage.getItem(TOKEN_KEY) || null; } catch (e) { return null; } };
 const setToken = t => { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} };
 const clearToken = () => { try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} };
-async function sha256hex(str) { return bufToHex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str))); }
+// owner = stretched hash of the passcode; sent as the x-ember-owner header that RLS scopes each row to.
+async function deriveOwner(pass) {
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: new TextEncoder().encode('ember-sync-v1'), iterations: 200000 }, k, 256);
+  return bufToHex(bits);
+}
 function migrateState(s) { if (s && Array.isArray(s.habits)) s.habits.forEach(h => { if (!h.icon) { h.icon = EMOJI2ICON[h.emoji] || 'spark'; delete h.emoji; } }); return s; }
 
 let syncState = 'off', syncTimer = 0;
@@ -1141,10 +1150,10 @@ async function syncPush() {
   setSyncStatus('syncing');
   try {
     const { rev, dirty, ...payload } = state;                    // don't ship device-local sync metadata
-    const r = await fetch(SYNC_URL, { method: 'PUT', headers: { 'x-ember-owner': token, 'content-type': 'application/json' }, body: JSON.stringify({ data: payload }) });
+    const r = await fetch(SB_REST, { method: 'POST', headers: { ...SB_HEAD(), 'x-ember-owner': token, 'content-type': 'application/json', prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ owner: token, data: payload }) });
     if (!r.ok) return setSyncStatus('error');
-    const { updatedAt } = await r.json();
-    state.rev = updatedAt; state.dirty = false; persist();
+    const saved = (await r.json())[0];
+    state.rev = saved && saved.updated_at; state.dirty = false; persist();
     setSyncStatus('synced');
   } catch (e) { setSyncStatus('offline'); }
 }
@@ -1154,10 +1163,11 @@ async function syncPull(opts = {}) {
   if (!navigator.onLine) return setSyncStatus('offline');
   setSyncStatus('syncing');
   try {
-    const r = await fetch(SYNC_URL, { headers: { 'x-ember-owner': token } });
+    const r = await fetch(`${SB_REST}?owner=eq.${token}&select=data,updated_at`, { headers: { ...SB_HEAD(), 'x-ember-owner': token } });
     if (!r.ok) return setSyncStatus('error');
-    const remote = await r.json();
-    const hasRemote = remote && remote.data && Array.isArray(remote.data.habits);
+    const row = (await r.json())[0];
+    const remote = { data: row ? row.data : null, updatedAt: row ? row.updated_at : null };
+    const hasRemote = remote.data && Array.isArray(remote.data.habits);
     if (!hasRemote) { state.dirty = true; persist(); return syncPush(); }         // nothing in the cloud yet → seed it from here
     if (state.dirty && !opts.preferRemote) return syncPush();                      // local has unpushed edits → they win
     if (remote.updatedAt !== state.rev) {                                          // adopt the newer cloud state
