@@ -308,6 +308,8 @@
     <button class="add-btn" id="add-habit-btn">＋ New habit</button>
     <div class="section-title">App lock</div>
     <div class="data-actions" id="lock-actions"></div>
+    <div class="section-title">Cloud sync</div>
+    <p class="hint" id="sync-status" style="margin:2px 2px 0">Set a passcode above to sync across your devices.</p>
     <div class="section-title">Your data</div>
     <div class="data-actions">
       <button class="ghost-btn" id="export-btn">Export JSON</button>
@@ -406,7 +408,8 @@ function load() {
   } catch (e) {}
   return { version: 1, habits: seedHabits(), logs: {}, settings: {} };
 }
-function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { toast('⚠️ Could not save — storage full?'); } }
+function persist() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { toast('⚠️ Could not save — storage full?'); } }
+function save() { state.dirty = true; persist(); schedulePush(); }   // schedulePush is a no-op until a passcode (sync token) exists
 
 /* =============== dates =============== */
 function toKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
@@ -1038,8 +1041,10 @@ $('#lock-form').addEventListener('submit', async e => {
   if (ok) {
     unlockedThisSession = true;
     if ($('#lock-remember').checked) rememberDevice(30);
+    try { setToken(await sha256hex(pass)); } catch (e) {}
     $('#lock-pass').value = ''; $('#lock-err').textContent = '';
     hideLock();
+    syncPull();                       // same passcode -> pull this account's cloud data
   } else {
     $('#lock-err').textContent = 'Wrong passcode — try again.';
     $('#lock-pass').value = ''; $('#lock-pass').focus();
@@ -1086,8 +1091,8 @@ function openLockSheet(mode) {
     const err = m => { $('#lk-err').textContent = m; };
     if (mode !== 'set' && !(await verifyPass($('#lk-cur').value).catch(() => false))) return err('Current passcode is wrong.');
     if (mode === 'remove') {
-      delete state.settings.lock; save(); forgetDevice();
-      closeSheet(); renderLockActions(); toast('Lock removed'); return;
+      delete state.settings.lock; save(); forgetDevice(); clearToken(); setSyncStatus('off');
+      closeSheet(); renderLockActions(); toast('Lock removed — cloud sync off'); return;
     }
     const p = $('#lk-new').value;
     if (p.length < 4) return err('Use at least 4 characters.');
@@ -1096,11 +1101,73 @@ function openLockSheet(mode) {
     state.settings.lock = { salt, iterations, hash: await passHash(p, salt, iterations) };
     save();
     unlockedThisSession = true; rememberDevice(30);   // don't lock the device that just set it
+    try { setToken(await sha256hex(p)); } catch (e) {}
     closeSheet(); renderLockActions();
     toast(mode === 'set' ? 'Passcode set 🔒' : 'Passcode changed');
+    syncPull({ preferRemote: true });   // adopt existing cloud data for this passcode if any; else seed it
   });
   openSheet();
   setTimeout(() => $(mode === 'set' ? '#lk-new' : '#lk-cur').focus(), 250);
+}
+
+/* =============== cloud sync (Supabase via the /api/sync proxy) ===============
+   Source of truth is Supabase; localStorage is the offline copy. The sync token is
+   sha256(passcode) — the same secret that gates the app locally also keys the cloud
+   blob, so there's no separate login. Sync only runs once a passcode is set, and the
+   same passcode on another device pulls the same data. Whole-state last-write-wins by
+   an opaque server revision; `dirty` marks unpushed local edits so offline changes
+   survive and win on reconnect. */
+const SYNC_URL = '/api/sync';
+const TOKEN_KEY = 'ember.token';
+const getToken = () => { try { return localStorage.getItem(TOKEN_KEY) || null; } catch (e) { return null; } };
+const setToken = t => { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} };
+const clearToken = () => { try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} };
+async function sha256hex(str) { return bufToHex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str))); }
+function migrateState(s) { if (s && Array.isArray(s.habits)) s.habits.forEach(h => { if (!h.icon) { h.icon = EMOJI2ICON[h.emoji] || 'spark'; delete h.emoji; } }); return s; }
+
+let syncState = 'off', syncTimer = 0;
+const SYNC_LABEL = {
+  off: 'Set a passcode above to sync across your devices (same passcode = same data).',
+  syncing: 'Syncing…', synced: 'Synced to the cloud ✓',
+  offline: 'Offline — changes will sync when you’re back online.', error: 'Sync error — will retry.',
+};
+function setSyncStatus(s) { syncState = s; const el = $('#sync-status'); if (el) el.textContent = SYNC_LABEL[s] || ''; }
+function schedulePush() { if (!getToken()) return; clearTimeout(syncTimer); syncTimer = setTimeout(syncPush, 1500); }
+
+async function syncPush() {
+  const token = getToken(); if (!token) return;
+  if (!state.dirty) { setSyncStatus('synced'); return; }
+  if (!navigator.onLine) { setSyncStatus('offline'); return; }
+  setSyncStatus('syncing');
+  try {
+    const { rev, dirty, ...payload } = state;                    // don't ship device-local sync metadata
+    const r = await fetch(SYNC_URL, { method: 'PUT', headers: { 'x-ember-owner': token, 'content-type': 'application/json' }, body: JSON.stringify({ data: payload }) });
+    if (!r.ok) return setSyncStatus('error');
+    const { updatedAt } = await r.json();
+    state.rev = updatedAt; state.dirty = false; persist();
+    setSyncStatus('synced');
+  } catch (e) { setSyncStatus('offline'); }
+}
+
+async function syncPull(opts = {}) {
+  const token = getToken(); if (!token) return setSyncStatus('off');
+  if (!navigator.onLine) return setSyncStatus('offline');
+  setSyncStatus('syncing');
+  try {
+    const r = await fetch(SYNC_URL, { headers: { 'x-ember-owner': token } });
+    if (!r.ok) return setSyncStatus('error');
+    const remote = await r.json();
+    const hasRemote = remote && remote.data && Array.isArray(remote.data.habits);
+    if (!hasRemote) { state.dirty = true; persist(); return syncPush(); }         // nothing in the cloud yet → seed it from here
+    if (state.dirty && !opts.preferRemote) return syncPush();                      // local has unpushed edits → they win
+    if (remote.updatedAt !== state.rev) {                                          // adopt the newer cloud state
+      state = migrateState(remote.data);
+      state.rev = remote.updatedAt; state.dirty = false; persist();
+      if (viewDate > todayKey()) viewDate = todayKey();
+      render();
+    }
+    setSyncStatus('synced');
+  } catch (e) { setSyncStatus('offline'); }
 }
 
 /* =============== data actions =============== */
@@ -1145,8 +1212,10 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', render);
 new MutationObserver(render).observe(document.documentElement, { attributeFilter: ['data-theme'] });
 render();
 if (lockActive()) showLock();
-// New day rollover while the app stays open on the home screen
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (viewDate > todayKey()) viewDate = todayKey(); render(); } });
+if (getToken()) syncPull(); else setSyncStatus('off');
+addEventListener('online', () => { if (getToken()) { syncPush(); syncPull(); } });
+// New day rollover + cloud refresh while the app stays open on the home screen
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (viewDate > todayKey()) viewDate = todayKey(); render(); syncPull(); } });
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
