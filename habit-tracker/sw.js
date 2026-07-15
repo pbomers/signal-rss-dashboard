@@ -1,5 +1,5 @@
 /* Ember service worker — offline-first shell */
-const CACHE = 'ember-v1';
+const CACHE = 'ember-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -11,7 +11,12 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // Precache resiliently: one missing asset must not sink the whole install.
+  e.waitUntil(
+    caches.open(CACHE)
+      .then((c) => Promise.allSettled(ASSETS.map((a) => c.add(a))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', (e) => {
