@@ -1,0 +1,1234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ember — habit tracker</title>
+<meta name="description" content="A tiny, fast habit tracker. Check habits off, count water and drinks, log your weight, and keep your streaks alive.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f9f9f7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d0d0d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ember">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<style>
+  :root{
+    color-scheme: light dark;
+    --page:#f9f9f7; --surface:#fcfcfb; --surface-2:#f0efec;
+    --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --baseline:#c3c2b7; --border:rgba(11,11,11,.10);
+    --good:#0ca30c; --good-text:#006300; --warn:#fab219; --crit:#d03b3b;
+    --accent:#2a78d6;
+    --hue-0:#2a78d6; --hue-1:#008300; --hue-2:#e87ba4; --hue-3:#eda100;
+    --hue-4:#1baf7a; --hue-5:#eb6834; --hue-6:#4a3aa7; --hue-7:#e34948;
+    --shadow:0 1px 2px rgba(11,11,11,.05), 0 4px 16px rgba(11,11,11,.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --page:#0d0d0d; --surface:#1a1a19; --surface-2:#242422;
+      --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+      --grid:#2c2c2a; --baseline:#383835; --border:rgba(255,255,255,.10);
+      --good:#0ca30c; --good-text:#0ca30c;
+      --accent:#3987e5;
+      --hue-0:#3987e5; --hue-1:#008300; --hue-2:#d55181; --hue-3:#c98500;
+      --hue-4:#199e70; --hue-5:#d95926; --hue-6:#9085e9; --hue-7:#e66767;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0; padding:0}
+  body{
+    background:var(--page); color:var(--ink);
+    font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;
+    padding-bottom:calc(76px + env(safe-area-inset-bottom));
+    overscroll-behavior-y:contain;
+  }
+  .wrap{max-width:480px; margin:0 auto; padding:0 16px}
+  button{font:inherit; color:inherit; background:none; border:none; padding:0; cursor:pointer}
+  button:focus-visible, input:focus-visible, select:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:8px}
+  h1,h2,h3{margin:0; font-weight:650}
+
+  /* ---------- header ---------- */
+  header.app{
+    position:sticky; top:0; z-index:20;
+    background:color-mix(in srgb, var(--page) 86%, transparent);
+    -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--border);
+    padding-top:env(safe-area-inset-top);
+  }
+  .head-row{display:flex; align-items:center; gap:12px; padding:12px 0}
+  .head-title{flex:1; min-width:0}
+  .head-title .kicker{font-size:12px; color:var(--muted); letter-spacing:.4px; text-transform:uppercase; font-weight:600}
+  .head-title h1{font-size:22px; letter-spacing:-.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .daynav{display:flex; align-items:center; gap:2px}
+  .daynav button{
+    width:38px; height:38px; border-radius:12px; display:grid; place-items:center;
+    color:var(--ink-2); font-size:20px; border:1px solid transparent;
+  }
+  .daynav button:active{background:var(--surface-2)}
+  .daynav button:disabled{opacity:.3}
+  .ring-wrap{position:relative; width:44px; height:44px; flex:none}
+  .ring-wrap svg{display:block}
+  .ring-label{
+    position:absolute; inset:0; display:grid; place-items:center;
+    font-size:11px; font-weight:700; color:var(--ink-2); letter-spacing:-.3px;
+  }
+
+  /* ---------- habit cards (Today) ---------- */
+  .cards{display:flex; flex-direction:column; gap:10px; padding:14px 0 8px}
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:18px;
+    box-shadow:var(--shadow); padding:14px; position:relative; overflow:hidden;
+  }
+  .habit-row{display:flex; align-items:center; gap:12px}
+  .icon-chip{
+    width:46px; height:46px; flex:none; border-radius:14px; display:grid; place-items:center;
+    color:var(--accent); background:color-mix(in srgb, var(--accent) 14%, var(--surface));
+  }
+  .ic{width:24px; height:24px; display:block}
+  .ic .t2{opacity:.35}
+  .chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:9px}
+  .chip{
+    font-size:12px; font-weight:650; padding:5px 10px; border-radius:99px;
+    background:var(--surface-2); color:var(--ink-2); font-variant-numeric:tabular-nums;
+  }
+  .chip:active{background:var(--baseline)}
+  .habit-main{flex:1; min-width:0}
+  .habit-name{font-weight:650; font-size:16px; letter-spacing:-.1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .habit-sub{font-size:13px; color:var(--muted); display:flex; align-items:center; gap:6px; margin-top:1px}
+  .streak-pill{display:inline-flex; align-items:center; gap:3px; font-weight:600; color:var(--ink-2)}
+  .streak-pill.hot{color:var(--ink)}
+  /* check button */
+  .check-btn{
+    width:46px; height:46px; flex:none; border-radius:50%;
+    border:2.5px solid var(--baseline); display:grid; place-items:center;
+    color:transparent; font-size:22px; font-weight:800; transition:transform .12s, background .15s, border-color .15s;
+  }
+  .check-btn:active{transform:scale(.9)}
+  .check-btn.done{background:var(--good); border-color:var(--good); color:#fff}
+  /* stepper */
+  .stepper{display:flex; align-items:center; gap:2px; flex:none}
+  .stepper button{
+    width:40px; height:40px; border-radius:13px; background:var(--surface-2);
+    display:grid; place-items:center; font-size:22px; font-weight:600; color:var(--ink-2);
+    transition:transform .1s;
+  }
+  .stepper button:active{transform:scale(.9)}
+  .stepper .val{min-width:52px; text-align:center; font-weight:700; font-size:17px; letter-spacing:-.3px}
+  .stepper .val small{display:block; font-size:10.5px; color:var(--muted); font-weight:600; margin-top:-2px}
+  /* measure button */
+  .measure-btn{
+    flex:none; padding:10px 14px; border-radius:13px; background:var(--surface-2);
+    font-weight:700; font-size:15px; letter-spacing:-.2px; min-width:76px; text-align:center;
+  }
+  .measure-btn.empty{color:var(--accent)}
+  .measure-btn small{display:block; font-size:10.5px; color:var(--muted); font-weight:600}
+  /* progress bar strip */
+  .bar-track{height:5px; border-radius:99px; background:var(--surface-2); margin-top:12px; overflow:hidden}
+  .bar-fill{height:100%; border-radius:99px; background:var(--accent); transition:width .25s}
+  .bar-fill.over{background:var(--crit)}
+  .limit-note{font-size:12px; margin-top:6px; color:var(--muted)}
+  .limit-note.over{color:var(--crit); font-weight:600}
+  .empty-state{padding:48px 24px; text-align:center; color:var(--muted)}
+  .empty-state .big{display:flex; justify-content:center; margin-bottom:10px}
+  .empty-state .big .ic{width:40px; height:40px}
+
+  /* ---------- trends ---------- */
+  .section-title{font-size:13px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin:18px 0 8px}
+  .trend-head{display:flex; align-items:center; gap:10px; margin-bottom:10px}
+  .trend-head .icon-chip{width:36px;height:36px;border-radius:11px}
+  .trend-head .icon-chip .ic{width:19px;height:19px}
+  .tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px}
+  .tile{background:var(--surface-2); border-radius:12px; padding:9px 11px}
+  .tile .t-label{font-size:11px; color:var(--muted); font-weight:600}
+  .tile .t-value{font-size:19px; font-weight:700; letter-spacing:-.4px; margin-top:1px}
+  .tile .t-value .u{font-size:12px; font-weight:600; color:var(--ink-2)}
+  .tile .t-delta{font-size:11px; font-weight:600}
+  .t-delta.up-good{color:var(--good-text)} .t-delta.down-bad{color:var(--crit)} .t-delta.flat{color:var(--muted)}
+  .chart-box{position:relative}
+  .chart-box svg{display:block; width:100%; height:auto}
+  .chart-title{font-size:12px; color:var(--muted); font-weight:600; margin:2px 0 6px}
+  .chart-legend{display:flex; gap:14px; align-items:center; font-size:11px; color:var(--muted); margin:0 0 6px}
+  .chart-legend .lg{display:inline-flex; align-items:center; gap:5px}
+  .chart-legend .lg-bar{width:10px; height:10px; border-radius:3px}
+  .chart-legend .lg-line{width:14px; height:2px; border-radius:2px; background:var(--ink); opacity:.85}
+  /* heatmap */
+  .heat{display:grid; grid-auto-flow:column; gap:3px; justify-content:start; margin-top:2px}
+  .heat-col{display:grid; grid-template-rows:repeat(7,1fr); gap:3px}
+  .heat-cell{width:13px; height:13px; border-radius:3.5px; background:var(--surface-2)}
+  .heat-cell.f{background:transparent}
+  .heat-cell.x{box-shadow:inset 0 0 0 1.5px var(--crit)}
+  .heat-legend{display:flex; align-items:center; gap:4px; font-size:11px; color:var(--muted); margin-top:8px}
+  .heat-legend .heat-cell{width:10px;height:10px}
+
+  /* ---------- manage ---------- */
+  .manage-row{display:flex; align-items:center; gap:12px}
+  .manage-row .habit-main{padding:2px 0}
+  .icon-btn{
+    width:38px; height:38px; flex:none; border-radius:12px; background:var(--surface-2);
+    display:grid; place-items:center; color:var(--ink-2);
+  }
+  .icon-btn .ic{width:17px; height:17px}
+  .add-btn{
+    width:100%; padding:14px; border-radius:18px; border:1.5px dashed var(--baseline);
+    color:var(--ink-2); font-weight:650; font-size:15px; margin-top:2px;
+  }
+  .data-actions{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px}
+  .data-actions .wide{grid-column:1/-1}
+  .ghost-btn{
+    padding:12px; border-radius:14px; background:var(--surface); border:1px solid var(--border);
+    font-weight:600; font-size:14px; color:var(--ink-2); text-align:center;
+  }
+  .ghost-btn.danger{color:var(--crit)}
+  .archived-tag{font-size:11px; color:var(--muted); border:1px solid var(--border); border-radius:99px; padding:1px 8px}
+
+  /* ---------- bottom nav ---------- */
+  nav.tabs{
+    position:fixed; bottom:0; left:0; right:0; z-index:30;
+    background:color-mix(in srgb, var(--page) 88%, transparent);
+    -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+    border-top:1px solid var(--border);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .tabs-inner{max-width:480px; margin:0 auto; display:grid; grid-template-columns:repeat(3,1fr)}
+  .tab{
+    padding:10px 0 9px; display:flex; flex-direction:column; align-items:center; gap:2px;
+    font-size:11px; font-weight:600; color:var(--muted);
+  }
+  .tab .t-ico{font-size:21px; line-height:1; filter:grayscale(1); opacity:.55; transition:.15s}
+  .tab .t-ico .ic{width:22px; height:22px}
+  .tab.active{color:var(--ink)}
+  .tab.active .t-ico{filter:none; opacity:1; transform:translateY(-1px)}
+
+  /* ---------- sheet ---------- */
+  .sheet-scrim{position:fixed; inset:0; z-index:40; background:rgba(0,0,0,.42); opacity:0; pointer-events:none; transition:opacity .2s}
+  .sheet{
+    position:fixed; left:0; right:0; bottom:0; z-index:41;
+    background:var(--surface); border-radius:22px 22px 0 0; border:1px solid var(--border); border-bottom:none;
+    max-width:520px; margin:0 auto; padding:10px 18px calc(18px + env(safe-area-inset-bottom));
+    transform:translateY(105%); transition:transform .25s cubic-bezier(.3,.9,.3,1);
+    max-height:88vh; overflow:auto;
+  }
+  .sheet-open .sheet{transform:none}
+  .sheet-open .sheet-scrim{opacity:1; pointer-events:auto}
+  .grabber{width:38px; height:4px; border-radius:99px; background:var(--baseline); margin:2px auto 14px}
+  .sheet h2{font-size:19px; margin-bottom:14px; letter-spacing:-.2px}
+  .field{margin-bottom:13px}
+  .field label{display:block; font-size:12.5px; font-weight:650; color:var(--ink-2); margin-bottom:5px}
+  .field input[type=text], .field input[type=number], .field select{
+    width:100%; padding:12px 13px; border-radius:13px; border:1px solid var(--border);
+    background:var(--page); color:var(--ink); font:inherit; font-size:16px;
+  }
+  .icon-grid{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:4px}
+  .icon-grid button{
+    height:44px; border-radius:12px; background:var(--surface-2); color:var(--ink-2);
+    display:grid; place-items:center;
+  }
+  .icon-grid button .ic{width:22px; height:22px}
+  .icon-grid button.on{background:var(--accent); color:#fff}
+  .seg{display:grid; grid-template-columns:repeat(4,1fr); gap:5px}
+  .seg button{
+    padding:9px 4px; border-radius:11px; background:var(--surface-2); font-size:12px; font-weight:650; color:var(--ink-2);
+    display:flex; flex-direction:column; gap:3px; align-items:center;
+  }
+  .seg button .ic{width:18px; height:18px}
+  .seg button.on{background:var(--accent); color:#fff}
+  .two-col{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .primary-btn{
+    width:100%; padding:14px; border-radius:15px; background:var(--accent); color:#fff;
+    font-weight:700; font-size:16px; margin-top:4px;
+  }
+  .sheet .danger-link{width:100%; text-align:center; color:var(--crit); font-weight:600; font-size:14px; padding:12px 0 2px}
+  .big-input{font-size:30px !important; font-weight:700; text-align:center; letter-spacing:-.5px}
+  .hint{font-size:12px; color:var(--muted); margin-top:5px}
+
+  /* ---------- tooltip ---------- */
+  .tip{
+    position:fixed; z-index:60; pointer-events:none; opacity:0; transition:opacity .1s;
+    background:var(--ink); color:var(--page); font-size:12px; font-weight:600;
+    padding:6px 9px; border-radius:9px; max-width:220px; box-shadow:var(--shadow);
+    transform:translate(-50%,-130%);
+  }
+  .tip small{display:block; font-weight:500; opacity:.75}
+  .toast{
+    position:fixed; left:50%; bottom:calc(90px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(8px);
+    background:var(--ink); color:var(--page); padding:9px 16px; border-radius:99px;
+    font-size:13.5px; font-weight:600; z-index:70; opacity:0; transition:.2s; pointer-events:none; white-space:nowrap;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%)}
+  .view{display:none} .view.active{display:block}
+
+  /* ---------- passcode lock ---------- */
+  .lock{position:fixed; inset:0; z-index:100; background:var(--page); display:grid; place-items:center; padding:24px}
+  .lock[hidden]{display:none}
+  body.locked main, body.locked header.app, body.locked nav.tabs{visibility:hidden}
+  .lock-card{width:100%; max-width:320px; text-align:center}
+  .lock-flame{display:flex; justify-content:center; color:var(--accent); margin-bottom:14px}
+  .lock-flame .ic{width:52px; height:52px}
+  .lock-card h2{font-size:20px; margin-bottom:18px; letter-spacing:-.2px}
+  .lock-card input[type=password]{
+    width:100%; padding:14px; border-radius:14px; border:1px solid var(--border);
+    background:var(--surface); color:var(--ink); font-size:22px; text-align:center; letter-spacing:4px;
+  }
+  .lock-card .remember{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    font-size:13.5px; color:var(--ink-2); margin:14px 0 4px; user-select:none;
+  }
+  .lock-card .remember input{width:17px; height:17px; accent-color:var(--accent)}
+  .lock-err{min-height:20px; font-size:13px; font-weight:600; color:var(--crit); margin-top:10px}
+  .lock-card.shake{animation:shake .35s}
+  @keyframes shake{20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important} }
+</style>
+</head>
+<body>
+
+<header class="app">
+  <div class="wrap head-row">
+    <div class="head-title">
+      <div class="kicker" id="head-kicker">Ember</div>
+      <h1 id="head-date">Today</h1>
+    </div>
+    <div class="daynav" id="daynav">
+      <button id="nav-prev" aria-label="Previous day">‹</button>
+      <button id="nav-next" aria-label="Next day">›</button>
+    </div>
+    <div class="ring-wrap" id="day-ring" title="Habits on track today"></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="view active" id="view-today"><div class="cards" id="today-cards"></div></section>
+  <section class="view" id="view-trends"><div id="trends-body"></div></section>
+  <section class="view" id="view-manage">
+    <div class="cards" id="manage-cards"></div>
+    <button class="add-btn" id="add-habit-btn">＋ New habit</button>
+    <div class="section-title">App lock</div>
+    <div class="data-actions" id="lock-actions"></div>
+    <div class="section-title">Cloud sync</div>
+    <p class="hint" id="sync-status" style="margin:2px 2px 0">Set a passcode above to sync across your devices.</p>
+    <div class="section-title">Your data</div>
+    <div class="data-actions">
+      <button class="ghost-btn" id="export-btn">Export JSON</button>
+      <button class="ghost-btn" id="import-btn">Import JSON</button>
+      <button class="ghost-btn danger wide" id="reset-btn">Erase all data</button>
+    </div>
+    <p class="hint" style="margin:14px 2px 24px">Everything lives on this device (localStorage) — no account, no server. Tip: open this page in Safari/Chrome on your phone and use <b>Add to Home Screen</b> to install it like an app.</p>
+    <input type="file" id="import-file" accept="application/json" hidden>
+  </section>
+</main>
+
+<nav class="tabs">
+  <div class="tabs-inner">
+    <button class="tab active" data-view="today"><span class="t-ico">🔥</span>Today</button>
+    <button class="tab" data-view="trends"><span class="t-ico" data-tab-icon="chart"></span>Trends</button>
+    <button class="tab" data-view="manage"><span class="t-ico" data-tab-icon="sliders"></span>Habits</button>
+  </div>
+</nav>
+
+<div class="lock" id="lock-screen" hidden role="dialog" aria-label="Passcode required">
+  <div class="lock-card" id="lock-card">
+    <div class="lock-flame"><span data-tab-icon="flame"></span></div>
+    <h2>Ember is locked</h2>
+    <form id="lock-form">
+      <input type="password" id="lock-pass" placeholder="Passcode" autocomplete="current-password" inputmode="text" aria-label="Passcode">
+      <label class="remember"><input type="checkbox" id="lock-remember" checked> Remember this device for 30 days</label>
+      <button type="submit" class="primary-btn" id="lock-unlock">Unlock</button>
+    </form>
+    <div class="lock-err" id="lock-err"></div>
+    <button class="danger-link" id="lock-forgot">Forgot passcode?</button>
+  </div>
+</div>
+
+<div class="sheet-scrim" id="sheet-scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+<div class="tip" id="tip"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* =============== two-tone icon set ===============
+   Every glyph is two tones of the habit's accent: .t1 solid, .t2 at 35%. */
+const ICONS = {
+  spark: '<path class="t1" d="M12 2.5C12.6 7 13.5 8.4 18 9.5 13.5 10.6 12.6 12 12 16.5 11.4 12 10.5 10.6 6 9.5 10.5 8.4 11.4 7 12 2.5z"/><path class="t2" d="M17.5 13.5c.3 1.8.7 2.4 2.5 2.75-1.8.35-2.2.95-2.5 2.75-.3-1.8-.7-2.4-2.5-2.75 1.8-.35 2.2-.95 2.5-2.75z"/>',
+  bed: '<rect class="t2" x="2" y="10.5" width="20" height="7" rx="2.2"/><rect class="t2" x="2.8" y="17" width="2.2" height="3.2" rx="1"/><rect class="t2" x="19" y="17" width="2.2" height="3.2" rx="1"/><rect class="t1" x="4" y="6.8" width="6.5" height="4.6" rx="2"/><path class="t1" d="M12 7.4h6.5A3.5 3.5 0 0 1 22 10.9v.5H12z"/>',
+  scale: '<path class="t2" d="M12 4.2a8.8 8.8 0 0 0-6.6 14.6h13.2A8.8 8.8 0 0 0 12 4.2z"/><rect class="t1" x="11.1" y="6.4" width="1.8" height="7.6" rx=".9" transform="rotate(38 12 13.3)"/><circle class="t1" cx="12" cy="13.3" r="2"/>',
+  drop: '<path class="t1" d="M12 2.8S5.2 10 5.2 14.6a6.8 6.8 0 0 0 13.6 0C18.8 10 12 2.8 12 2.8z"/><circle class="t2" cx="9.4" cy="14.9" r="2.1"/>',
+  drink: '<path class="t2" d="M5 6.5h10.5V17a2.5 2.5 0 0 1-2.5 2.5H7.5A2.5 2.5 0 0 1 5 17z"/><path class="t1" d="M15.5 8.6h1.7a3.15 3.15 0 0 1 0 6.3h-1.7v-2h1.6a1.15 1.15 0 0 0 0-2.3h-1.6z"/><circle class="t1" cx="7.1" cy="5.9" r="2"/><circle class="t1" cx="10.3" cy="4.9" r="2.3"/><circle class="t1" cx="13.5" cy="5.9" r="2"/>',
+  run: '<circle class="t1" cx="14.7" cy="4.7" r="2"/><g class="t1" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M14.2 8.4l-3.5 2.5 1.7 3.4-3.1 4.3"/><path d="M12.4 14.3l3.5 1.1 1.5 3.5"/><path d="M14.2 8.4l2.7 1.9 2.5-.7"/></g><g class="t2" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M3.4 9h3M2.4 13h3"/></g>',
+  book: '<path class="t1" d="M12 6.2C9.4 4.6 6 4.4 3 5.3V18c3-.9 6.4-.7 9 .9z"/><path class="t2" d="M12 6.2c2.6-1.6 6-1.8 9-.9V18c-3-.9-6.4-.7-9 .9z"/>',
+  moon: '<path class="t1" d="M14.8 3.2A8.8 8.8 0 1 0 20.8 15 7.2 7.2 0 0 1 14.8 3.2z"/><path class="t2" d="M17.8 3.4c.25 1.55.62 2.05 2.17 2.35-1.55.3-1.92.8-2.17 2.35-.25-1.55-.62-2.05-2.17-2.35 1.55-.3 1.92-.8 2.17-2.35z"/>',
+  pill: '<g transform="rotate(-35 12 12)"><rect class="t2" x="4" y="8.7" width="16" height="6.6" rx="3.3"/><rect class="t1" x="4" y="8.7" width="8" height="6.6" rx="3.3"/></g>',
+  coffee: '<path class="t2" d="M4 8h12v6.5A4.5 4.5 0 0 1 11.5 19h-3A4.5 4.5 0 0 1 4 14.5z"/><path class="t1" d="M16 9.5h1.6a2.9 2.9 0 0 1 0 5.8H16v-2h1.5a.9.9 0 0 0 0-1.8H16z"/><g class="t1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M8 3.4v2.2M12 3.4v2.2"/></g>',
+  dumbbell: '<rect class="t1" x="2.6" y="7.6" width="3.4" height="8.8" rx="1.4"/><rect class="t1" x="18" y="7.6" width="3.4" height="8.8" rx="1.4"/><rect class="t2" x="6.4" y="10.3" width="11.2" height="3.4" rx="1.6"/>',
+  leaf: '<path class="t2" d="M20.5 3.5C9.5 3.5 3.8 9.8 3.8 19.8c10.5 0 16.7-6.3 16.7-16.3z"/><path class="t1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" d="M4.6 19.4C8.5 13.5 12.5 9.5 19 5"/>',
+  pen: '<path class="t2" d="M13.2 6.2l4.6 4.6-8.2 8.2H5v-4.6z"/><path class="t1" d="M14.6 4.8l1.2-1.2a2.55 2.55 0 0 1 3.6 3.6l-1.2 1.2z"/>',
+  music: '<path class="t2" d="M8 6.2l10.6-2.1v3.4L8 9.6z"/><rect class="t1" x="8" y="7.6" width="1.7" height="10.2" rx=".85"/><rect class="t1" x="16.9" y="5.7" width="1.7" height="10.2" rx=".85"/><circle class="t1" cx="7" cy="17.6" r="2.6"/><circle class="t1" cx="15.9" cy="15.7" r="2.6"/>',
+  coin: '<ellipse class="t2" cx="12" cy="15.2" rx="8.2" ry="4.3"/><ellipse class="t1" cx="12" cy="8.8" rx="8.2" ry="4.3"/>',
+  sun: '<circle class="t1" cx="12" cy="12" r="4.3"/><g class="t2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6"/></g>',
+  heart: '<path class="t1" d="M12 20.2C5.4 15.6 3 12.3 3 8.9A4.9 4.9 0 0 1 12 6.2 4.9 4.9 0 0 1 21 8.9c0 3.4-2.4 6.7-9 11.3z"/><circle class="t2" cx="7.4" cy="8.4" r="1.8"/>',
+  flame: '<path class="t1" d="M12 2.4c1.1 4.6-5 7-5 12.8a5 5 0 0 0 10 0c0-2.5-1.2-4.1-2.4-5.9-.5 2.4-2.2 3-2.2 3s1.2-5.1-.4-9.9z"/><path class="t2" d="M12 21.4a3.5 3.5 0 0 1-3.5-3.5c0-2 1.75-3.2 3.5-5.1 1.75 1.9 3.5 3.1 3.5 5.1A3.5 3.5 0 0 1 12 21.4z"/>',
+  check: '<circle class="t2" cx="12" cy="12" r="9"/><path class="t1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="M7.6 12.4l3 3 5.8-6.4"/>',
+  ban: '<circle class="t2" cx="12" cy="12" r="9"/><path class="t1" d="M5.6 4.2l14.2 14.2-1.4 1.4L4.2 5.6z"/>',
+  chart: '<rect class="t2" x="3" y="13" width="4" height="7" rx="1.3"/><rect class="t1" x="10" y="9" width="4" height="11" rx="1.3"/><rect class="t2" x="17" y="4.5" width="4" height="15.5" rx="1.3"/>',
+  sliders: '<g class="t2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></g><circle class="t1" cx="9" cy="7" r="2.3"/><circle class="t1" cx="15" cy="12" r="2.3"/><circle class="t1" cx="7" cy="17" r="2.3"/>',
+  edit: '<path class="t2" d="M13.2 6.2l4.6 4.6-8.2 8.2H5v-4.6z"/><path class="t1" d="M14.6 4.8l1.2-1.2a2.55 2.55 0 0 1 3.6 3.6l-1.2 1.2z"/>',
+  pause: '<rect class="t1" x="6" y="4.5" width="4" height="15" rx="1.6"/><rect class="t2" x="14" y="4.5" width="4" height="15" rx="1.6"/>',
+  play: '<path class="t1" d="M8 4.8a1.4 1.4 0 0 1 2.1-1.2l10 6.2a1.4 1.4 0 0 1 0 2.4l-10 6.2A1.4 1.4 0 0 1 8 17.2z" transform="translate(-1.5 0)"/><rect class="t2" x="4" y="4.5" width="2.4" height="15" rx="1.2"/>',
+};
+function icon(name) { return `<svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${ICONS[name] || ICONS.spark}</svg>`; }
+
+/* =============== state =============== */
+const STORE_KEY = 'ember.v1';
+const HUES = 8;
+const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
+
+const seedHabits = () => ([
+  { id: uid(), name: 'Make the bed', icon: 'bed',   type: 'check',   goal: 1, unit: '',        hue: 0 },
+  { id: uid(), name: 'Weigh in',     icon: 'scale', type: 'measure', goal: 0, unit: 'lbs',     hue: 6 },
+  { id: uid(), name: 'Water',        icon: 'drop',  type: 'count',   goal: 8, unit: 'glasses', hue: 4 },
+  { id: uid(), name: 'Drinks',       icon: 'drink', type: 'limit',   goal: 2, unit: 'drinks',  hue: 3 },
+].map(h => ({ ...h, createdAt: todayKey(), archived: false })));
+
+const EMOJI2ICON = { '🛏️':'bed','⚖️':'scale','💧':'drop','🍺':'drink','🏃':'run','🚶':'run','📖':'book','😴':'moon','💊':'pill','☕':'coffee','💪':'dumbbell','🥗':'leaf','✍️':'pen','🎸':'music','💰':'coin','🌞':'sun','🧘':'heart','🧹':'spark','🦷':'spark','🚭':'ban','✨':'spark' };
+let state = load();
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s && s.version === 1 && Array.isArray(s.habits)) {
+        s.habits.forEach(h => { if (!h.icon) { h.icon = EMOJI2ICON[h.emoji] || 'spark'; delete h.emoji; } });
+        return s;
+      }
+    }
+  } catch (e) {}
+  return { version: 1, habits: seedHabits(), logs: {}, settings: {} };
+}
+function persist() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { toast('⚠️ Could not save — storage full?'); } }
+function save() { state.dirty = true; persist(); schedulePush(); }   // schedulePush is a no-op until a passcode (sync token) exists
+
+/* =============== dates =============== */
+function toKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function fromKey(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); }
+function todayKey() { return toKey(new Date()); }
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+const FMT_DAY = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+const FMT_MD  = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+
+/* =============== log access =============== */
+function getVal(hid, key) { const day = state.logs[key]; return day ? day[hid] : undefined; }
+function setVal(hid, key, v) {
+  if (v === undefined || v === null) { if (state.logs[key]) { delete state.logs[key][hid]; if (!Object.keys(state.logs[key]).length) delete state.logs[key]; } }
+  else (state.logs[key] || (state.logs[key] = {}))[hid] = v;
+  save();
+}
+
+/* =============== limit-habit time entries ===============
+   A "stay under" day is an array of clock times, one per unit consumed
+   ("14:05"; null when the time is unknown, e.g. backfilled days).
+   Older numeric values still count via limitCount. */
+function limitTimes(v) { return Array.isArray(v) ? v.slice() : Array(v || 0).fill(null); }
+function limitCount(v) { return Array.isArray(v) ? v.length : (v || 0); }
+function nowHM() { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+
+/* =============== streak logic =============== */
+/* Success rules: check → done at least once · count → reached goal ·
+   limit → stayed at/under the cap (an unlogged day counts as 0, i.e. success) ·
+   measure → logged a value that day. */
+function successOn(h, key) {
+  const v = getVal(h.id, key);
+  if (h.type === 'check')   return (v || 0) >= 1;
+  if (h.type === 'count')   return (v || 0) >= h.goal;
+  if (h.type === 'limit')   return limitCount(v) <= h.goal;
+  if (h.type === 'measure') return v !== undefined;
+  return false;
+}
+/* Earliest day that can affect a habit's stats. Backfilled entries may predate
+   createdAt, so scan the logs; limit habits stay bounded at creation because
+   an unlogged day counts as success there. */
+function logFloor(h) {
+  if (h.type === 'limit') return h.createdAt;
+  let min = h.createdAt;
+  for (const k of Object.keys(state.logs)) if (state.logs[k][h.id] !== undefined && k < min) min = k;
+  return min;
+}
+/* A habit may carry a "starting streak" (h.base) from before it was tracked
+   here. It counts only while the run is unbroken all the way back to the first
+   tracked day — one missed day and the base is gone, like any real streak. */
+function currentStreak(h) {
+  let d = new Date();
+  if (!successOn(h, toKey(d))) d = addDays(d, -1);   // today isn't over — don't break the streak yet
+  const floor = logFloor(h);
+  let s = 0, unbrokenToStart = false;
+  while (true) {
+    if (toKey(d) < floor) { unbrokenToStart = true; break; }
+    if (!successOn(h, toKey(d))) break;
+    s++; d = addDays(d, -1);
+    if (s > 36600) break;
+  }
+  return s + (unbrokenToStart ? (h.base || 0) : 0);
+}
+function bestStreak(h) {
+  let best = 0, run = 0, anchored = true;   // the run growing from the first tracked day carries the base
+  const t = todayKey();
+  for (let d = fromKey(logFloor(h)); toKey(d) <= t; d = addDays(d, 1)) {
+    if (successOn(h, toKey(d))) { run++; best = Math.max(best, run + (anchored ? (h.base || 0) : 0)); }
+    else { run = 0; anchored = false; }
+  }
+  return Math.max(best, currentStreak(h));
+}
+function rate30(h) {
+  const t = new Date(); const floor = logFloor(h); let hit = 0, n = 0;
+  for (let i = 0; i < 30; i++) {
+    const k = toKey(addDays(t, -i));
+    if (k < floor) break;
+    n++; if (successOn(h, k)) hit++;
+  }
+  return n ? Math.round(100 * hit / n) : 0;
+}
+
+/* =============== helpers =============== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const activeHabits = () => state.habits.filter(h => !h.archived);
+function hueVar(h) { return `var(--hue-${(h.hue ?? 0) % HUES})`; }
+function fmtNum(v, dec) { return Number(v).toLocaleString(undefined, { maximumFractionDigits: dec ?? 1 }); }
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._h); toast._h = setTimeout(() => t.classList.remove('show'), 1800); }
+
+/* =============== view routing =============== */
+let viewDate = todayKey();
+let curView = 'today';
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => {
+  curView = b.dataset.view;
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === b));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + curView));
+  hideTip(); render();
+  window.scrollTo({ top: 0 });
+}));
+$('#nav-prev').addEventListener('click', () => { viewDate = toKey(addDays(fromKey(viewDate), -1)); render(); });
+$('#nav-next').addEventListener('click', () => { if (viewDate < todayKey()) { viewDate = toKey(addDays(fromKey(viewDate), 1)); render(); } });
+
+/* =============== render: header =============== */
+function renderHeader() {
+  const isToday = viewDate === todayKey();
+  const titles = { today: isToday ? 'Today' : FMT_DAY.format(fromKey(viewDate)), trends: 'Trends', manage: 'Habits' };
+  const kickers = { today: isToday ? FMT_DAY.format(new Date()) : 'Logging past day', trends: 'Streaks & progress', manage: 'Ember' };
+  $('#head-date').textContent = titles[curView];
+  $('#head-kicker').textContent = kickers[curView];
+  $('#daynav').style.visibility = curView === 'today' ? 'visible' : 'hidden';
+  $('#nav-next').disabled = isToday;
+
+  const hs = activeHabits();
+  const done = hs.filter(h => successOn(h, viewDate)).length;
+  const pct = hs.length ? done / hs.length : 0;
+  const R = 17, C = 2 * Math.PI * R;
+  $('#day-ring').innerHTML =
+    `<svg width="44" height="44" viewBox="0 0 44 44" aria-label="${done} of ${hs.length} habits on track">
+      <circle cx="22" cy="22" r="${R}" fill="none" stroke="var(--surface-2)" stroke-width="5"/>
+      <circle cx="22" cy="22" r="${R}" fill="none" stroke="${pct >= 1 ? 'var(--good)' : 'var(--accent)'}" stroke-width="5"
+        stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct)}"
+        transform="rotate(-90 22 22)" style="transition:stroke-dashoffset .3s"/>
+    </svg><div class="ring-label">${done}/${hs.length}</div>`;
+}
+
+/* =============== render: today =============== */
+function renderToday() {
+  const box = $('#today-cards');
+  const hs = activeHabits();
+  if (!hs.length) { box.innerHTML = `<div class="empty-state"><div class="big">${icon('spark')}</div>No habits yet.<br>Add your first one in the <b>Habits</b> tab.</div>`; return; }
+  box.innerHTML = hs.map(h => cardHTML(h)).join('');
+  hs.forEach(h => bindCard(h));
+}
+function cardHTML(h) {
+  const v = getVal(h.id, viewDate);
+  const cs = currentStreak(h);
+  const flame = cs > 0 ? `<span class="streak-pill ${cs >= 7 ? 'hot' : ''}">🔥 ${cs.toLocaleString()} day${cs > 1 ? 's' : ''}</span>` : `<span class="streak-pill">Start a streak</span>`;
+  let control = '', extra = '';
+  if (h.type === 'check') {
+    control = `<button class="check-btn ${v >= 1 ? 'done' : ''}" data-act="toggle" aria-label="Mark ${esc(h.name)} ${v >= 1 ? 'not done' : 'done'}">✓</button>`;
+  } else if (h.type === 'count') {
+    const n = v || 0, pct = Math.min(100, 100 * n / h.goal);
+    control = stepperHTML(n, `of ${h.goal}`);
+    extra = `<div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${hueVar(h)}"></div></div>`;
+  } else if (h.type === 'limit') {
+    const times = limitTimes(v), n = times.length, over = n > h.goal;
+    const pct = Math.min(100, 100 * n / Math.max(h.goal, 1));
+    const chips = n ? `<div class="chips">${times.map((t, i) =>
+      `<button class="chip" data-act="time" data-i="${i}" aria-label="Edit entry ${i + 1} time">${t || 'time?'}</button>`).join('')}</div>` : '';
+    control = stepperHTML(n, `of ≤${h.goal}`);
+    extra = `<div class="bar-track"><div class="bar-fill ${over ? 'over' : ''}" style="width:${over ? 100 : pct}%; ${over ? '' : `background:${hueVar(h)}`}"></div></div>
+      <div class="limit-note ${over ? 'over' : ''}">${over ? `${n - h.goal} over your limit` : `${h.goal - n} left under your limit`}</div>${chips}`;
+  } else { // measure
+    control = v !== undefined
+      ? `<button class="measure-btn" data-act="measure">${fmtNum(v)}<small>${esc(h.unit || '')}</small></button>`
+      : `<button class="measure-btn empty" data-act="measure">＋ log<small>${esc(h.unit || '')}</small></button>`;
+  }
+  return `<div class="card" data-hid="${h.id}" style="--accent:${hueVar(h)}">
+    <div class="habit-row">
+      <div class="icon-chip">${icon(h.icon)}</div>
+      <div class="habit-main"><div class="habit-name">${esc(h.name)}</div><div class="habit-sub">${flame}</div></div>
+      ${control}
+    </div>${extra}</div>`;
+}
+function stepperHTML(n, subtitle) {
+  return `<div class="stepper">
+    <button data-act="dec" aria-label="Decrease">−</button>
+    <div class="val">${n}<small>${subtitle}</small></div>
+    <button data-act="inc" aria-label="Increase">＋</button>
+  </div>`;
+}
+function bindCard(h) {
+  const card = document.querySelector(`.card[data-hid="${h.id}"]`);
+  if (!card) return;
+  card.addEventListener('click', e => {
+    const btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    const act = btn.dataset.act;
+    const v = getVal(h.id, viewDate);
+    if (act === 'toggle') setVal(h.id, viewDate, v >= 1 ? undefined : 1);
+    if (act === 'inc') {
+      if (h.type === 'limit') { const a = limitTimes(v); a.push(viewDate === todayKey() ? nowHM() : null); setVal(h.id, viewDate, a); }
+      else setVal(h.id, viewDate, (v || 0) + 1);
+    }
+    if (act === 'dec') {
+      if (h.type === 'limit') { const a = limitTimes(v); a.pop(); setVal(h.id, viewDate, a); }
+      else setVal(h.id, viewDate, Math.max(0, (v || 0) - 1));
+    }
+    if (act === 'measure') { openMeasureSheet(h); return; }
+    if (act === 'time') { openTimeSheet(h, +btn.dataset.i); return; }
+    render();
+    if (act === 'toggle' && getVal(h.id, viewDate) >= 1) {
+      const cs = currentStreak(h);
+      if (cs === 1) toast('Nice — day one 🔥'); else if (cs % 7 === 0) toast(`🔥 ${cs.toLocaleString()}-day streak!`);
+    }
+  });
+}
+
+/* =============== render: trends =============== */
+const RAMP_LIGHT = ['#cde2fb', '#9ec5f4', '#5598e7', '#2a78d6', '#184f95'];
+const RAMP_DARK  = ['#0d366b', '#184f95', '#256abf', '#3987e5', '#86b6ef'];
+const isDark = () => {
+  const t = document.documentElement.dataset.theme;   // host page may stamp a manual toggle
+  return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+};
+const ramp = t => { const r = isDark() ? RAMP_DARK : RAMP_LIGHT; return r[Math.max(0, Math.min(r.length - 1, Math.round(t * (r.length - 1))))]; };
+
+function renderTrends() {
+  const box = $('#trends-body');
+  const hs = activeHabits();
+  if (!hs.length) { box.innerHTML = `<div class="empty-state"><div class="big">${icon('chart')}</div>Add a habit to see trends.</div>`; return; }
+  box.innerHTML = hs.map(h => {
+    const cs = currentStreak(h), bs = bestStreak(h), r = rate30(h);
+    let chart = '', weekTiles = '';
+    if (h.type === 'measure') chart = lineChartHTML(h);
+    else if (h.type === 'count' || h.type === 'limit') chart = barChartHTML(h);
+    if (h.type === 'limit') {
+      const thisW = weekAvg(h, 0), lastW = weekAvg(h, 7);
+      const delta = (thisW !== null && lastW !== null) ? thisW - lastW : null;
+      const deltaHTML = delta === null ? '<span class="t-delta flat">—</span>' :
+        `<div class="t-delta ${Math.abs(delta) < 0.05 ? 'flat' : delta < 0 ? 'up-good' : 'down-bad'}">${delta >= 0 ? '+' : ''}${fmtNum(delta)}/day vs last wk</div>`;
+      weekTiles = `<div class="tiles" style="margin-top:-4px">
+        <div class="tile"><div class="t-label">This week</div><div class="t-value">${thisW === null ? '—' : fmtNum(thisW)}<span class="u">/day</span></div></div>
+        <div class="tile"><div class="t-label">Last week</div><div class="t-value">${lastW === null ? '—' : fmtNum(lastW)}<span class="u">/day</span></div></div>
+        <div class="tile"><div class="t-label">Change</div><div class="t-value" style="font-size:15px; padding-top:4px">${deltaHTML}</div></div>
+      </div>`;
+    }
+    return `<div class="card" style="--accent:${hueVar(h)}; margin:10px 0">
+      <div class="trend-head"><div class="icon-chip">${icon(h.icon)}</div><h3>${esc(h.name)}</h3></div>
+      <div class="tiles">
+        <div class="tile"><div class="t-label">Streak</div><div class="t-value">${cs > 0 ? '🔥 ' : ''}${cs.toLocaleString()}<span class="u"> d</span></div></div>
+        <div class="tile"><div class="t-label">Best</div><div class="t-value">${bs.toLocaleString()}<span class="u"> d</span></div></div>
+        <div class="tile"><div class="t-label">Last 30 days</div><div class="t-value">${r}<span class="u">%</span></div></div>
+      </div>
+      ${weekTiles}${chart}
+      <div class="chart-title">Last 12 weeks</div>
+      ${heatmapHTML(h)}
+    </div>`;
+  }).join('');
+  bindChartTips(box);
+}
+
+/* --- 12-week heatmap: columns = weeks (Mon-first), sequential blue by intensity --- */
+function heatmapHTML(h) {
+  const today = new Date();
+  const dow = (today.getDay() + 6) % 7;              // Mon=0
+  const weekEnd = addDays(today, 6 - dow);           // this week's Sunday
+  const floor = logFloor(h);
+  let cols = '';
+  for (let w = 11; w >= 0; w--) {
+    let cells = '';
+    for (let r = 0; r < 7; r++) {
+      const d = addDays(weekEnd, -(w * 7) - (6 - r));
+      const k = toKey(d);
+      if (k > todayKey() || k < floor) { cells += `<div class="heat-cell f"></div>`; continue; }
+      const v = getVal(h.id, k);
+      let style = '', cls = '', label = FMT_MD.format(d), sub = 'No entry';
+      const ok = successOn(h, k);
+      if (h.type === 'check') { if (ok) { style = `background:${ramp(1)}`; sub = 'Done ✓'; } else sub = 'Missed'; }
+      else if (h.type === 'count') { const n = v || 0; if (n > 0) { style = `background:${ramp(Math.min(1, n / h.goal))}`; } sub = `${n}/${h.goal} ${h.unit || ''}`; }
+      else if (h.type === 'limit') {
+        const n = limitCount(v);
+        const ts = limitTimes(v).filter(Boolean).join(' · ');
+        if (ok) { style = `background:${ramp(1 - Math.min(1, n / Math.max(h.goal, 1)) * 0.6)}`; sub = `${n} ${h.unit || ''} — under limit ✓${ts ? ' · ' + ts : ''}`; }
+        else { cls = 'x'; sub = `${n} ${h.unit || ''} — over limit${ts ? ' · ' + ts : ''}`; }
+      }
+      else if (h.type === 'measure') { if (ok) { style = `background:${ramp(1)}`; sub = `${fmtNum(v)} ${h.unit || ''}`; } }
+      cells += `<div class="heat-cell ${cls}" style="${style}" data-tip="${esc(label)}" data-sub="${esc(sub)}"></div>`;
+    }
+    cols += `<div class="heat-col">${cells}</div>`;
+  }
+  const legend = h.type === 'limit'
+    ? `<div class="heat-legend">over <div class="heat-cell x"></div><div class="heat-cell"></div><div class="heat-cell" style="background:${ramp(0.5)}"></div><div class="heat-cell" style="background:${ramp(1)}"></div> under limit</div>`
+    : `<div class="heat-legend">less <div class="heat-cell"></div><div class="heat-cell" style="background:${ramp(0.33)}"></div><div class="heat-cell" style="background:${ramp(0.66)}"></div><div class="heat-cell" style="background:${ramp(1)}"></div> more</div>`;
+  return `<div class="heat">${cols}</div>${legend}`;
+}
+
+/* --- line chart: measure habits, last 90 days --- */
+function lineChartHTML(h) {
+  const N = 90, today = new Date(), pts = [];
+  for (let i = N - 1; i >= 0; i--) {
+    const k = toKey(addDays(today, -i));
+    const v = getVal(h.id, k);
+    if (v !== undefined) pts.push({ k, v, i: N - 1 - i });
+  }
+  if (pts.length < 2) return `<div class="chart-title">Log ${esc(h.name.toLowerCase())} on a few days to see your trend here.</div>`;
+  const W = 360, H = 150, P = { t: 14, r: 42, b: 20, l: 8 };
+  const iw = W - P.l - P.r, ih = H - P.t - P.b;
+  let lo = Math.min(...pts.map(p => p.v)), hi = Math.max(...pts.map(p => p.v));
+  if (hi === lo) { hi += 1; lo -= 1; } const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
+  const X = p => P.l + iw * (p.i / (N - 1));
+  const Y = v => P.t + ih * (1 - (v - lo) / (hi - lo));
+  const dLine = pts.map((p, j) => (j ? 'L' : 'M') + X(p).toFixed(1) + ' ' + Y(p.v).toFixed(1)).join(' ');
+  const last = pts[pts.length - 1];
+  const dArea = dLine + ` L${X(last).toFixed(1)} ${P.t + ih} L${X(pts[0]).toFixed(1)} ${P.t + ih} Z`;
+  // 3 clean gridlines
+  let grid = '', span = hi - lo;
+  const step = niceStep(span / 3);
+  for (let g = Math.ceil(lo / step) * step; g <= hi; g += step) {
+    grid += `<line x1="${P.l}" x2="${P.l + iw}" y1="${Y(g).toFixed(1)}" y2="${Y(g).toFixed(1)}" stroke="var(--grid)" stroke-width="1"/>
+      <text x="${P.l + iw + 6}" y="${(Y(g) + 3.5).toFixed(1)}" font-size="10" fill="var(--muted)" style="font-variant-numeric:tabular-nums">${fmtNum(g, step < 1 ? 1 : 0)}</text>`;
+  }
+  // visible dots only when sparse — dense daily data reads as a line; invisible
+  // circles stay as generous tap targets for the tooltip either way
+  const sparse = pts.length <= 32;
+  const dots = pts.map((p, j) => {
+    const vis = (sparse || j === pts.length - 1)
+      ? `<circle cx="${X(p).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="4" fill="${hueVar(h)}" stroke="var(--surface)" stroke-width="2" pointer-events="none"/>` : '';
+    return `${vis}<circle cx="${X(p).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="8" fill="transparent"
+       data-tip="${esc(FMT_MD.format(fromKey(p.k)))}" data-sub="${fmtNum(p.v)} ${esc(h.unit || '')}"/>`;
+  }).join('');
+  // stat tiles
+  const wk = pts.filter(p => p.i >= N - 7);
+  const avg7 = wk.length ? wk.reduce((a, p) => a + p.v, 0) / wk.length : last.v;
+  const monthAgo = pts.filter(p => p.i <= N - 30).slice(-1)[0];
+  const delta = monthAgo ? last.v - monthAgo.v : null;
+  const deltaHTML = delta === null ? '' :
+    `<div class="t-delta ${Math.abs(delta) < 0.05 ? 'flat' : delta < 0 ? 'up-good' : 'down-bad'}">${delta >= 0 ? '+' : ''}${fmtNum(delta)} in 30d</div>`;
+  return `
+    <div class="tiles" style="margin-top:-4px">
+      <div class="tile"><div class="t-label">Latest</div><div class="t-value">${fmtNum(last.v)}<span class="u"> ${esc(h.unit || '')}</span></div></div>
+      <div class="tile"><div class="t-label">7-day avg</div><div class="t-value">${fmtNum(avg7)}</div></div>
+      <div class="tile"><div class="t-label">Change</div><div class="t-value" style="font-size:15px; padding-top:4px">${deltaHTML || '<span class="t-delta flat">—</span>'}</div></div>
+    </div>
+    <div class="chart-title">${esc(h.name)} — last 90 days</div>
+    <div class="chart-box"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(h.name)} trend line chart">
+      ${grid}
+      <path d="${dArea}" fill="${hueVar(h)}" opacity="0.1"/>
+      <path d="${dLine}" fill="none" stroke="${hueVar(h)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      ${dots}
+      <text x="${Math.min(X(last), W - P.r) .toFixed(1)}" y="${(Y(last.v) - 9).toFixed(1)}" font-size="11" font-weight="700" fill="var(--ink)" text-anchor="middle">${fmtNum(last.v)}</text>
+    </svg></div>`;
+}
+function niceStep(x) { const p = Math.pow(10, Math.floor(Math.log10(Math.max(x, 1e-6)))); const n = x / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
+
+/* --- bar chart: count/limit habits. Limit habits get a 28-day window with a
+   7-day rolling-average overlay (same measure, same axis) to track reduction. --- */
+function barChartHTML(h) {
+  const isLimit = h.type === 'limit';
+  const N = isLimit ? 28 : 14, today = new Date(), W = 360, H = 130, P = { t: 16, r: 40, b: 18, l: 8 };
+  const iw = W - P.l - P.r, ih = H - P.t - P.b;
+  const floor = logFloor(h);
+  const days = [];
+  for (let i = N - 1; i >= 0; i--) {
+    const d = addDays(today, -i); const k = toKey(d); const raw = getVal(h.id, k);
+    days.push({ k, d, raw, v: k < floor ? null : (isLimit ? limitCount(raw) : (raw ?? 0)) });
+  }
+  const maxV = Math.max(h.goal, ...days.map(x => x.v || 0), 1);
+  const slot = iw / N, bw = Math.min(24, slot - (isLimit ? 2.5 : 4));
+  const Y = v => P.t + ih * (1 - v / maxV);
+  let bars = '', labels = '';
+  const labelEvery = isLimit ? 4 : 2;
+  days.forEach((x, j) => {
+    const cx = P.l + slot * j + slot / 2;
+    if ((N - 1 - j) % labelEvery === 0) labels += `<text x="${cx.toFixed(1)}" y="${H - 5}" font-size="9.5" fill="var(--muted)" text-anchor="middle">${x.d.getDate()}</text>`;
+    if (x.v === null) return;
+    const over = h.type === 'limit' && x.v > h.goal;
+    const fill = over ? 'var(--crit)' : hueVar(h);
+    const ts = h.type === 'limit' ? limitTimes(x.raw).filter(Boolean).join(' · ') : '';
+    const tipSub = h.type === 'limit' ? `${x.v} ${h.unit || ''}${over ? ' — over limit' : ' — under ✓'}${ts ? ' · ' + ts : ''}` : `${x.v}/${h.goal} ${h.unit || ''}`;
+    if (x.v === 0) {
+      bars += `<rect x="${(cx - bw / 2).toFixed(1)}" y="${P.t + ih - 2}" width="${bw.toFixed(1)}" height="2" rx="1" fill="var(--baseline)" data-tip="${esc(FMT_MD.format(x.d))}" data-sub="${esc(tipSub)}"/>`;
+      return;
+    }
+    const y = Y(x.v), hh = P.t + ih - y, r = Math.min(4, hh);
+    bars += `<path d="M${(cx - bw / 2).toFixed(1)} ${(P.t + ih).toFixed(1)} V${(y + r).toFixed(1)} Q${(cx - bw / 2).toFixed(1)} ${y.toFixed(1)} ${(cx - bw / 2 + r).toFixed(1)} ${y.toFixed(1)} H${(cx + bw / 2 - r).toFixed(1)} Q${(cx + bw / 2).toFixed(1)} ${y.toFixed(1)} ${(cx + bw / 2).toFixed(1)} ${(y + r).toFixed(1)} V${(P.t + ih).toFixed(1)} Z"
+      fill="${fill}" data-tip="${esc(FMT_MD.format(x.d))}" data-sub="${esc(tipSub)}"/>`;
+  });
+  /* 7-day rolling average overlay — the day-over-day reduction trend */
+  let avgLine = '', legend = '';
+  if (isLimit) {
+    const pts = [];
+    days.forEach((x, j) => {
+      if (x.v === null) return;
+      let s = 0, m = 0;
+      for (let b = 0; b < 7; b++) {
+        const kk = toKey(addDays(x.d, -b));
+        if (kk < floor) break;
+        s += limitCount(getVal(h.id, kk)); m++;
+      }
+      if (m) pts.push({ j, avg: s / m });
+    });
+    if (pts.length >= 2) {
+      const px = p => P.l + slot * p.j + slot / 2;
+      const d = pts.map((p, i) => (i ? 'L' : 'M') + px(p).toFixed(1) + ' ' + Y(p.avg).toFixed(1)).join(' ');
+      const last = pts[pts.length - 1];
+      avgLine = `<path class="avg-line" d="${d}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+        <circle cx="${px(last).toFixed(1)}" cy="${Y(last.avg).toFixed(1)}" r="4" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"
+          data-tip="7-day average" data-sub="${fmtNum(last.avg)} ${esc(h.unit || '')}/day"/>
+        <text x="${px(last).toFixed(1)}" y="${(Y(last.avg) - 9).toFixed(1)}" font-size="10.5" font-weight="700" fill="var(--ink)" text-anchor="end">${fmtNum(last.avg)}</text>`;
+      legend = `<div class="chart-legend">
+        <span class="lg"><span class="lg-bar" style="background:${hueVar(h)}"></span>daily</span>
+        <span class="lg"><span class="lg-line"></span>7-day average</span>
+        <span class="lg"><span class="lg-bar" style="background:var(--crit)"></span>over limit</span>
+      </div>`;
+    }
+  }
+  const gy = Y(h.goal);
+  const goalLabel = isLimit ? `limit ${h.goal}` : `goal ${h.goal}`;
+  return `<div class="chart-title">${esc(h.name)} — last ${N} days</div>${legend}
+    <div class="chart-box"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(h.name)} last ${N} days bar chart">
+      <line x1="${P.l}" x2="${P.l + iw}" y1="${P.t + ih}" y2="${P.t + ih}" stroke="var(--baseline)" stroke-width="1"/>
+      <line x1="${P.l}" x2="${P.l + iw}" y1="${gy.toFixed(1)}" y2="${gy.toFixed(1)}" stroke="var(--muted)" stroke-width="1"/>
+      <text x="${P.l + iw + 4}" y="${(gy + 3.5).toFixed(1)}" font-size="10" fill="var(--muted)">${goalLabel}</text>
+      ${bars}${avgLine}${labels}
+    </svg></div>`;
+}
+/* Average per day over the 7 days ending `endOffset` days ago (0 = week ending today). */
+function weekAvg(h, endOffset) {
+  const floor = logFloor(h);
+  let s = 0, m = 0;
+  for (let i = endOffset; i < endOffset + 7; i++) {
+    const k = toKey(addDays(new Date(), -i));
+    if (k < floor) break;
+    s += limitCount(getVal(h.id, k)); m++;
+  }
+  return m ? s / m : null;
+}
+
+/* --- tooltips (tap/hover) --- */
+function bindChartTips(root) {
+  root.querySelectorAll('[data-tip]').forEach(el => {
+    el.addEventListener('pointerdown', e => {
+      e.stopPropagation();
+      const r = el.getBoundingClientRect();
+      showTip(el.dataset.tip, el.dataset.sub, r.left + r.width / 2, r.top);
+    });
+  });
+}
+function showTip(title, sub, x, y) {
+  const t = $('#tip');
+  t.innerHTML = `${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}`;
+  t.style.left = Math.max(60, Math.min(innerWidth - 60, x)) + 'px';
+  t.style.top = y + 'px';
+  t.style.opacity = 1;
+  clearTimeout(showTip._h); showTip._h = setTimeout(hideTip, 2600);
+}
+function hideTip() { $('#tip').style.opacity = 0; }
+document.addEventListener('pointerdown', e => { if (!e.target.closest('[data-tip]')) hideTip(); });
+
+/* =============== render: manage =============== */
+const TYPE_META = {
+  check:   { label: 'Check off', ico: 'check', hint: 'Done / not done — e.g. make the bed' },
+  count:   { label: 'Build up',  ico: 'chart', hint: 'Count up to a daily goal — e.g. water' },
+  limit:   { label: 'Stay under',ico: 'ban',   hint: 'Cap it — success is staying at or under the limit. Each + stamps the time.' },
+  measure: { label: 'Track #',   ico: 'scale', hint: 'Log a number each day — e.g. weight' },
+};
+function renderManage() {
+  const box = $('#manage-cards');
+  box.innerHTML = state.habits.map(h => {
+    const meta = TYPE_META[h.type];
+    const detail = h.type === 'count' ? `goal ${h.goal} ${h.unit || ''}/day` :
+                   h.type === 'limit' ? `max ${h.goal} ${h.unit || ''}/day` :
+                   h.type === 'measure' ? `logs ${h.unit || 'a number'}` : 'daily check';
+    return `<div class="card" style="--accent:${hueVar(h)}; ${h.archived ? 'opacity:.55' : ''}">
+      <div class="manage-row">
+        <div class="icon-chip">${icon(h.icon)}</div>
+        <div class="habit-main">
+          <div class="habit-name">${esc(h.name)} ${h.archived ? '<span class="archived-tag">paused</span>' : ''}</div>
+          <div class="habit-sub">${meta.label} · ${esc(detail)}</div>
+        </div>
+        <button class="icon-btn" data-edit="${h.id}" aria-label="Edit ${esc(h.name)}">${icon('edit')}</button>
+        <button class="icon-btn" data-arch="${h.id}" aria-label="${h.archived ? 'Resume' : 'Pause'} ${esc(h.name)}">${icon(h.archived ? 'play' : 'pause')}</button>
+      </div></div>`;
+  }).join('');
+  box.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openHabitSheet(state.habits.find(h => h.id === b.dataset.edit))));
+  box.querySelectorAll('[data-arch]').forEach(b => b.addEventListener('click', () => {
+    const h = state.habits.find(x => x.id === b.dataset.arch);
+    h.archived = !h.archived; save(); render();
+  }));
+  renderLockActions();
+}
+
+/* =============== bottom sheet: add / edit habit =============== */
+const ICON_PICK = ['bed','scale','drop','drink','coffee','leaf','run','dumbbell','heart','moon','pill','book','pen','music','coin','sun','flame','spark'];
+let sheetType = 'check';
+function openHabitSheet(h) {
+  sheetType = h ? h.type : 'check';
+  let sheetIcon = h ? h.icon : 'spark';
+  const sheet = $('#sheet');
+  sheet.innerHTML = `
+    <div class="grabber"></div>
+    <h2>${h ? 'Edit habit' : 'New habit'}</h2>
+    <div class="field"><label for="f-name">Name</label>
+      <input type="text" id="f-name" placeholder="e.g. Morning run" value="${h ? esc(h.name) : ''}" maxlength="40"></div>
+    <div class="field"><label>Icon</label>
+      <div class="icon-grid" id="f-icon">${ICON_PICK.map(n =>
+        `<button type="button" data-ic="${n}" class="${n === sheetIcon ? 'on' : ''}" aria-label="${n}">${icon(n)}</button>`).join('')}</div></div>
+    <div class="field"><label>Type</label>
+      <div class="seg" id="f-type">${Object.entries(TYPE_META).map(([k, m]) =>
+        `<button type="button" data-t="${k}" class="${k === sheetType ? 'on' : ''}">${icon(m.ico)}${m.label}</button>`).join('')}</div>
+      <div class="hint" id="type-hint"></div></div>
+    <div class="two-col">
+      <div class="field" id="f-goal-wrap"><label for="f-goal" id="f-goal-label">Daily goal</label>
+        <input type="number" id="f-goal" inputmode="numeric" min="1" step="1" value="${h && h.goal ? h.goal : 8}"></div>
+      <div class="field" id="f-unit-wrap"><label for="f-unit">Unit</label>
+        <input type="text" id="f-unit" placeholder="glasses" value="${h ? esc(h.unit || '') : ''}" maxlength="14"></div>
+    </div>
+    <div class="field"><label for="f-base">Starting streak (days)</label>
+      <input type="number" id="f-base" inputmode="numeric" min="0" step="1" value="${h && h.base ? h.base : 0}">
+      <div class="hint">Already on a run before adding it here? Carry it over — e.g. 1,004. It keeps counting until you miss a day.</div></div>
+    <button class="primary-btn" id="f-save">${h ? 'Save changes' : 'Add habit'}</button>
+    ${h ? '<button class="danger-link" id="f-delete">Delete habit & its history</button>' : ''}`;
+  const syncType = () => {
+    sheet.querySelectorAll('#f-type button').forEach(b => b.classList.toggle('on', b.dataset.t === sheetType));
+    $('#type-hint').textContent = TYPE_META[sheetType].hint;
+    $('#f-goal-wrap').style.display = (sheetType === 'check' || sheetType === 'measure') ? 'none' : '';
+    $('#f-unit-wrap').style.display = sheetType === 'check' ? 'none' : '';
+    $('#f-goal-label').textContent = sheetType === 'limit' ? 'Daily limit (max)' : 'Daily goal';
+  };
+  syncType();
+  sheet.querySelectorAll('#f-type button').forEach(b => b.addEventListener('click', () => { sheetType = b.dataset.t; syncType(); }));
+  sheet.querySelectorAll('#f-icon [data-ic]').forEach(b => b.addEventListener('click', () => {
+    sheetIcon = b.dataset.ic;
+    sheet.querySelectorAll('#f-icon [data-ic]').forEach(x => x.classList.toggle('on', x === b));
+  }));
+  $('#f-save').addEventListener('click', () => {
+    const name = $('#f-name').value.trim();
+    if (!name) { $('#f-name').focus(); return; }
+    const goal = Math.max(sheetType === 'limit' ? 0 : 1, parseInt($('#f-goal').value, 10) || 1);
+    const base = Math.max(0, parseInt($('#f-base').value, 10) || 0);
+    const fields = { name, icon: sheetIcon, type: sheetType, goal, unit: $('#f-unit').value.trim(), base };
+    if (h) Object.assign(h, fields);
+    else state.habits.push({ id: uid(), ...fields, hue: state.habits.length % HUES, createdAt: todayKey(), archived: false });
+    save(); closeSheet(); render();
+    toast(h ? 'Saved' : 'Habit added');
+  });
+  if (h) $('#f-delete').addEventListener('click', () => {
+    if (!confirm(`Delete “${h.name}” and all of its history? This can’t be undone.`)) return;
+    state.habits = state.habits.filter(x => x.id !== h.id);
+    for (const k of Object.keys(state.logs)) { delete state.logs[k][h.id]; if (!Object.keys(state.logs[k]).length) delete state.logs[k]; }
+    save(); closeSheet(); render(); toast('Habit deleted');
+  });
+  openSheet();
+  if (!h) setTimeout(() => $('#f-name').focus(), 250);
+}
+
+/* --- measure entry sheet --- */
+function openMeasureSheet(h) {
+  const sheet = $('#sheet');
+  const existing = getVal(h.id, viewDate);
+  const lastKnown = (() => { for (let i = 0; i < 365; i++) { const v = getVal(h.id, toKey(addDays(fromKey(viewDate), -i))); if (v !== undefined) return v; } return ''; })();
+  sheet.innerHTML = `
+    <div class="grabber"></div>
+    <h2>${esc(h.name)} — ${viewDate === todayKey() ? 'today' : FMT_MD.format(fromKey(viewDate))}</h2>
+    <div class="field">
+      <input type="number" id="m-val" class="big-input" inputmode="decimal" step="0.1" placeholder="${lastKnown || '0.0'}" value="${existing ?? ''}">
+      <div class="hint" style="text-align:center">${esc(h.unit || '')}${lastKnown !== '' ? ` · last: ${fmtNum(lastKnown)}` : ''}</div>
+    </div>
+    <button class="primary-btn" id="m-save">Save</button>
+    ${existing !== undefined ? '<button class="danger-link" id="m-clear">Clear this entry</button>' : ''}`;
+  $('#m-save').addEventListener('click', () => {
+    const raw = $('#m-val').value.trim().replace(',', '.');
+    const v = parseFloat(raw);
+    if (isNaN(v)) { $('#m-val').focus(); return; }
+    setVal(h.id, viewDate, v); closeSheet(); render(); toast('Logged ✓');
+  });
+  $('#m-val').addEventListener('keydown', e => { if (e.key === 'Enter') $('#m-save').click(); });
+  const clr = $('#m-clear');
+  if (clr) clr.addEventListener('click', () => { setVal(h.id, viewDate, undefined); closeSheet(); render(); });
+  openSheet();
+  setTimeout(() => { const i = $('#m-val'); i.focus(); i.select(); }, 250);
+}
+
+/* --- time entry sheet (limit habits: adjust when each one was consumed) --- */
+function openTimeSheet(h, i) {
+  const sheet = $('#sheet');
+  const arr = limitTimes(getVal(h.id, viewDate));
+  if (!(i >= 0 && i < arr.length)) return;
+  sheet.innerHTML = `
+    <div class="grabber"></div>
+    <h2>${esc(h.name)} #${i + 1} — when?</h2>
+    <div class="field">
+      <input type="time" id="t-val" class="big-input" value="${arr[i] || ''}">
+      <div class="hint" style="text-align:center">${viewDate === todayKey() ? 'today' : FMT_MD.format(fromKey(viewDate))}</div>
+    </div>
+    <button class="primary-btn" id="t-save">Save time</button>
+    <button class="danger-link" id="t-remove">Remove this entry</button>`;
+  $('#t-save').addEventListener('click', () => {
+    arr[i] = $('#t-val').value || null;
+    setVal(h.id, viewDate, arr); closeSheet(); render();
+  });
+  $('#t-remove').addEventListener('click', () => {
+    arr.splice(i, 1);
+    setVal(h.id, viewDate, arr); closeSheet(); render();
+  });
+  openSheet();
+}
+
+function openSheet() { document.body.classList.add('sheet-open'); }
+function closeSheet() { document.body.classList.remove('sheet-open'); }
+$('#sheet-scrim').addEventListener('click', closeSheet);
+
+/* =============== passcode lock ===============
+   Static app, no server: the passcode is stored as a salted PBKDF2-SHA-256
+   hash in localStorage and gates the UI. "Remember this device" is a local
+   expiry flag (the no-server equivalent of a remember-me cookie). */
+const UNLOCK_KEY = 'ember.unlock';
+const lockSupported = () => window.isSecureContext && !!(crypto && crypto.subtle);
+const bufToHex = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+const hexToBuf = h => new Uint8Array((h.match(/../g) || []).map(x => parseInt(x, 16)));
+function randHex(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return bufToHex(a.buffer); }
+async function passHash(pass, saltHex, iterations) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: hexToBuf(saltHex), iterations }, key, 256);
+  return bufToHex(bits);
+}
+async function verifyPass(pass) {
+  const l = state.settings.lock;
+  return !!l && (await passHash(pass, l.salt, l.iterations)) === l.hash;
+}
+function rememberDevice(days) { try { localStorage.setItem(UNLOCK_KEY, JSON.stringify({ until: Date.now() + days * 864e5 })); } catch (e) {} }
+function forgetDevice() { try { localStorage.removeItem(UNLOCK_KEY); } catch (e) {} }
+let unlockedThisSession = false;
+function lockActive() {
+  if (!state.settings.lock || !lockSupported() || unlockedThisSession) return false;
+  try { const r = JSON.parse(localStorage.getItem(UNLOCK_KEY)); if (r && r.until > Date.now()) return false; } catch (e) {}
+  return true;
+}
+function showLock() { $('#lock-screen').hidden = false; document.body.classList.add('locked'); setTimeout(() => $('#lock-pass').focus(), 150); }
+function hideLock() { $('#lock-screen').hidden = true; document.body.classList.remove('locked'); }
+$('#lock-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const pass = $('#lock-pass').value;
+  if (!pass) return;
+  $('#lock-unlock').disabled = true;
+  const ok = await verifyPass(pass).catch(() => false);
+  $('#lock-unlock').disabled = false;
+  if (ok) {
+    unlockedThisSession = true;
+    if ($('#lock-remember').checked) rememberDevice(30);
+    try { setToken(await deriveOwner(pass)); } catch (e) {}
+    $('#lock-pass').value = ''; $('#lock-err').textContent = '';
+    hideLock();
+    syncPull();                       // same passcode -> pull this account's cloud data
+  } else {
+    $('#lock-err').textContent = 'Wrong passcode — try again.';
+    $('#lock-pass').value = ''; $('#lock-pass').focus();
+    const c = $('#lock-card'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
+  }
+});
+$('#lock-forgot').addEventListener('click', () => {
+  if (!confirm('Without the passcode the only way back in is a full reset — ALL habits and history on this device are erased. Continue?')) return;
+  if (!confirm('Really erase everything? There is no undo.')) return;
+  try { localStorage.removeItem(STORE_KEY); localStorage.removeItem(UNLOCK_KEY); } catch (e) {}
+  location.reload();
+});
+
+function renderLockActions() {
+  const la = $('#lock-actions');
+  if (!lockSupported()) { la.innerHTML = '<p class="hint wide">Passcode lock needs HTTPS (or localhost).</p>'; return; }
+  la.innerHTML = state.settings.lock
+    ? `<button class="ghost-btn" id="lk-change">Change passcode</button>
+       <button class="ghost-btn" id="lk-now">Lock now</button>
+       <button class="ghost-btn danger wide" id="lk-remove">Remove lock</button>`
+    : `<button class="ghost-btn wide" id="lk-set">Set a passcode</button>`;
+  const on = (id, fn) => { const b = $(id); if (b) b.addEventListener('click', fn); };
+  on('#lk-set', () => openLockSheet('set'));
+  on('#lk-change', () => openLockSheet('change'));
+  on('#lk-remove', () => openLockSheet('remove'));
+  on('#lk-now', () => { forgetDevice(); unlockedThisSession = false; showLock(); });
+}
+function openLockSheet(mode) {
+  const sheet = $('#sheet');
+  const titles = { set: 'Set a passcode', change: 'Change passcode', remove: 'Remove lock' };
+  sheet.innerHTML = `
+    <div class="grabber"></div>
+    <h2>${titles[mode]}</h2>
+    ${mode !== 'set' ? `<div class="field"><label for="lk-cur">Current passcode</label>
+      <input type="password" id="lk-cur" autocomplete="current-password"></div>` : ''}
+    ${mode !== 'remove' ? `<div class="field"><label for="lk-new">New passcode (4+ characters)</label>
+      <input type="password" id="lk-new" autocomplete="new-password"></div>
+    <div class="field"><label for="lk-conf">Repeat it</label>
+      <input type="password" id="lk-conf" autocomplete="new-password"></div>
+    <p class="hint">Locks the app behind a passcode when you open it. If you forget it, the only way back in is erasing the app's data — keep a backup exported.</p>` : ''}
+    <button class="primary-btn" id="lk-save">${titles[mode]}</button>
+    <div class="lock-err" id="lk-err"></div>`;
+  $('#lk-save').addEventListener('click', async () => {
+    const err = m => { $('#lk-err').textContent = m; };
+    if (mode !== 'set' && !(await verifyPass($('#lk-cur').value).catch(() => false))) return err('Current passcode is wrong.');
+    if (mode === 'remove') {
+      delete state.settings.lock; save(); forgetDevice(); clearToken(); setSyncStatus('off');
+      closeSheet(); renderLockActions(); toast('Lock removed — cloud sync off'); return;
+    }
+    const p = $('#lk-new').value;
+    if (p.length < 4) return err('Use at least 4 characters.');
+    if (p !== $('#lk-conf').value) return err('Passcodes don’t match.');
+    const salt = randHex(16), iterations = 180000;
+    state.settings.lock = { salt, iterations, hash: await passHash(p, salt, iterations) };
+    save();
+    unlockedThisSession = true; rememberDevice(30);   // don't lock the device that just set it
+    try { setToken(await deriveOwner(p)); } catch (e) {}
+    closeSheet(); renderLockActions();
+    toast(mode === 'set' ? 'Passcode set 🔒' : 'Passcode changed');
+    syncPull({ preferRemote: true });   // adopt existing cloud data for this passcode if any; else seed it
+  });
+  openSheet();
+  setTimeout(() => $(mode === 'set' ? '#lk-new' : '#lk-cur').focus(), 250);
+}
+
+/* =============== cloud sync (direct to Supabase) ===============
+   Source of truth is Supabase; localStorage is the offline copy. The browser calls
+   Supabase directly with the public publishable key; a row-level-security policy
+   scopes every request to the row whose `owner` matches the x-ember-owner header
+   (= PBKDF2(passcode)), so there's no login and no server. Sync only runs once a
+   passcode is set, and the same passcode on another device pulls the same data.
+   Whole-state last-write-wins by an opaque server revision; `dirty` marks unpushed
+   local edits so offline changes survive and win on reconnect. */
+const SB_URL = 'https://fuzisxdefycuwkhbuynx.supabase.co';
+const SB_KEY = 'sb_publishable_7J6VRBgBoNskWFoLdR6mFg_WrSuueef';   // publishable key — safe in client; RLS is the guard
+const SB_REST = SB_URL + '/rest/v1/ember_state';
+const SB_HEAD = () => ({ apikey: SB_KEY, authorization: 'Bearer ' + SB_KEY });
+const TOKEN_KEY = 'ember.token';
+const getToken = () => { try { return localStorage.getItem(TOKEN_KEY) || null; } catch (e) { return null; } };
+const setToken = t => { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} };
+const clearToken = () => { try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} };
+// owner = stretched hash of the passcode; sent as the x-ember-owner header that RLS scopes each row to.
+async function deriveOwner(pass) {
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: new TextEncoder().encode('ember-sync-v1'), iterations: 200000 }, k, 256);
+  return bufToHex(bits);
+}
+function migrateState(s) { if (s && Array.isArray(s.habits)) s.habits.forEach(h => { if (!h.icon) { h.icon = EMOJI2ICON[h.emoji] || 'spark'; delete h.emoji; } }); return s; }
+
+let syncState = 'off', syncTimer = 0;
+const SYNC_LABEL = {
+  off: 'Set a passcode above to sync across your devices (same passcode = same data).',
+  syncing: 'Syncing…', synced: 'Synced to the cloud ✓',
+  offline: 'Offline — changes will sync when you’re back online.', error: 'Sync error — will retry.',
+};
+function setSyncStatus(s) { syncState = s; const el = $('#sync-status'); if (el) el.textContent = SYNC_LABEL[s] || ''; }
+function schedulePush() { if (!getToken()) return; clearTimeout(syncTimer); syncTimer = setTimeout(syncPush, 1500); }
+
+async function syncPush() {
+  const token = getToken(); if (!token) return;
+  if (!state.dirty) { setSyncStatus('synced'); return; }
+  if (!navigator.onLine) { setSyncStatus('offline'); return; }
+  setSyncStatus('syncing');
+  try {
+    const { rev, dirty, ...payload } = state;                    // don't ship device-local sync metadata
+    const r = await fetch(SB_REST, { method: 'POST', headers: { ...SB_HEAD(), 'x-ember-owner': token, 'content-type': 'application/json', prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ owner: token, data: payload }) });
+    if (!r.ok) return setSyncStatus('error');
+    const saved = (await r.json())[0];
+    state.rev = saved && saved.updated_at; state.dirty = false; persist();
+    setSyncStatus('synced');
+  } catch (e) { setSyncStatus('offline'); }
+}
+
+async function syncPull(opts = {}) {
+  const token = getToken(); if (!token) return setSyncStatus('off');
+  if (!navigator.onLine) return setSyncStatus('offline');
+  setSyncStatus('syncing');
+  try {
+    const r = await fetch(`${SB_REST}?owner=eq.${token}&select=data,updated_at`, { headers: { ...SB_HEAD(), 'x-ember-owner': token } });
+    if (!r.ok) return setSyncStatus('error');
+    const row = (await r.json())[0];
+    const remote = { data: row ? row.data : null, updatedAt: row ? row.updated_at : null };
+    const hasRemote = remote.data && Array.isArray(remote.data.habits);
+    if (!hasRemote) { state.dirty = true; persist(); return syncPush(); }         // nothing in the cloud yet → seed it from here
+    if (state.dirty && !opts.preferRemote) return syncPush();                      // local has unpushed edits → they win
+    if (remote.updatedAt !== state.rev) {                                          // adopt the newer cloud state
+      state = migrateState(remote.data);
+      state.rev = remote.updatedAt; state.dirty = false; persist();
+      if (viewDate > todayKey()) viewDate = todayKey();
+      render();
+    }
+    setSyncStatus('synced');
+  } catch (e) { setSyncStatus('offline'); }
+}
+
+/* =============== data actions =============== */
+$('#add-habit-btn').addEventListener('click', () => openHabitSheet(null));
+$('#export-btn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ember-backup-${todayKey()}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+});
+$('#import-btn').addEventListener('click', () => $('#import-file').click());
+$('#import-file').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const s = JSON.parse(rd.result);
+      if (!s || s.version !== 1 || !Array.isArray(s.habits) || typeof s.logs !== 'object') throw 0;
+      state = s; save(); render(); toast('Backup restored ✓');
+    } catch { toast('⚠️ Not a valid Ember backup'); }
+  };
+  rd.readAsText(f); e.target.value = '';
+});
+$('#reset-btn').addEventListener('click', () => {
+  if (!confirm('Erase ALL habits and history on this device?')) return;
+  if (!confirm('Really sure? There is no undo.')) return;
+  state = { version: 1, habits: seedHabits(), logs: {}, settings: {} };
+  save(); render(); toast('Fresh start');
+});
+
+/* =============== boot =============== */
+function render() {
+  if (viewDate > todayKey()) viewDate = todayKey();
+  renderHeader();
+  if (curView === 'today') renderToday();
+  else if (curView === 'trends') renderTrends();
+  else renderManage();
+}
+document.querySelectorAll('[data-tab-icon]').forEach(el => { el.innerHTML = icon(el.dataset.tabIcon); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', render);
+new MutationObserver(render).observe(document.documentElement, { attributeFilter: ['data-theme'] });
+render();
+if (lockActive()) showLock();
+if (getToken()) syncPull(); else setSyncStatus('off');
+addEventListener('online', () => { if (getToken()) { syncPush(); syncPull(); } });
+// New day rollover + cloud refresh while the app stays open on the home screen
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (viewDate > todayKey()) viewDate = todayKey(); render(); syncPull(); } });
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
